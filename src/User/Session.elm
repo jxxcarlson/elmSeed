@@ -4,7 +4,7 @@ import Common.Utility as Utility
 import Configuration
 import Http
 import User.Coders
-import User.Types exposing (Msg(..), PublicUser, ReadingStat, User, UserRecord)
+import User.Types exposing (Msg(..), User, UserRecord)
 
 
 authenticate : String -> String -> Cmd Msg

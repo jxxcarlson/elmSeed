@@ -11,7 +11,7 @@ import Common.Utility as Utility
 import Json.Decode as Decode
 import Json.Decode.Pipeline exposing (required)
 import Json.Encode as Encode
-import User.Types exposing (PublicUser, User)
+import User.Types exposing (User)
 
 
 port infoForOutside : GenericOutsideData -> Cmd msg
@@ -70,17 +70,9 @@ userDecoderForOutside =
     Decode.succeed User
         |> required "username" Decode.string
         |> required "id" (Decode.map stringToInt Decode.string)
-        |> required "firstname" Decode.string
         |> required "email" Decode.string
         |> required "token" Decode.string
-        |> required "blurb" Decode.string
-        |> required "public" (Decode.map stringToBool Decode.string)
-        |> required "follow" (Decode.string |> Decode.map stringToPublicUserList)
-        |> required "followers" (Decode.string |> Decode.map stringToPublicUserList)
         |> required "admin" (Decode.map stringToBool Decode.string)
-        |> required "beginningDate" Decode.string
-        |> required "tags" (Decode.string |> Decode.map (String.split ","))
-        |> required "reading_stats" (Decode.string |> Decode.map statListStringToReadingStatList)
         |> required "verified" (Decode.map stringToBool Decode.string)
 
 
@@ -123,17 +115,9 @@ userEncoder user =
     Encode.object
         [ ( "username", Encode.string user.username )
         , ( "id", Encode.string (String.fromInt user.id) )
-        , ( "firstname", Encode.string user.firstname )
         , ( "email", Encode.string user.email )
         , ( "token", Encode.string user.token )
-        , ( "blurb", Encode.string user.blurb )
-        , ( "public", Encode.string (boolToString user.public) )
-        , ( "follow", Encode.string (publicUserListToString user.follow) )
-        , ( "followers", Encode.string (publicUserListToString user.followers) )
         , ( "admin", Encode.string (boolToString user.admin) )
-        , ( "beginningDate", Encode.string user.beginningDate )
-        , ( "tags", Encode.string (user.tags |> String.join ",") )
-        , ( "reading_stats", Encode.string (statListStringValue user.readingStats) )
         , ( "verified", Encode.string (boolToString user.verified) )
         ]
 
@@ -148,27 +132,6 @@ statListStringValue stats =
     stats
         |> List.map statStringValue
         |> String.join ","
-
-
-publicUserListToString : List PublicUser -> String
-publicUserListToString publicUserList =
-    publicUserList
-        |> List.map .username
-        |> String.join ","
-
-
-stringToPublicUserList : String -> List PublicUser
-stringToPublicUserList str =
-    str
-        |> String.split ","
-        |> List.map String.trim
-        |> List.map (\name -> { username = name })
-
-
-publicUserDecoder : Decode.Decoder PublicUser
-publicUserDecoder =
-    Decode.succeed PublicUser
-        |> required "username" Decode.string
 
 
 stringToBool : String -> Bool

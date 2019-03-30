@@ -13,7 +13,6 @@ import Routing.Helpers exposing (Route(..), parseUrl, reverseRoute)
 import SharedState exposing (SharedAppState(..), SharedState, SharedStateUpdate(..))
 import Url exposing (Url)
 import User.Types exposing (State(..))
-import User.Utility
 
 
 type alias Model =
@@ -82,7 +81,7 @@ update sharedState msg model =
                                     { oldUserModel | state = NotSignedIn }
 
                                 Just _ ->
-                                    { oldUserModel | state = SignedIn, tagString = User.Utility.tagsToString sharedState.currentUser }
+                                    { oldUserModel | state = SignedIn }
 
                         _ ->
                             oldUserModel

@@ -12,7 +12,7 @@ module Configuration exposing (backend, site)
 
 
 backend =
-    "https://arcane-cliffs-95237.herokuapp.com/"
+    "http://localhost:4000"
 
 site =
-    "REMOTE"
+    "LOCAL"

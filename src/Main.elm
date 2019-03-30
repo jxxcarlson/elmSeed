@@ -190,12 +190,9 @@ view model =
 reconnectUser : Model -> Url -> Posix -> Browser.Navigation.Key -> InfoForElm -> ( Model, Cmd Msg )
 reconnectUser model url posix navKey (LocalStorageInfo user) =
     let
-        beginningDate =
-            user.beginningDate
-
         appState =
             Ready
                 (initialSharedState navKey posix model.windowWidth model.windowHeight (Just user))
                 (Router.initialModel url)
     in
-    ( { model | appState = appState }, Cmd.batch [ pushUrl navKey "#books" ] )
+    ( { model | appState = appState }, Cmd.none )

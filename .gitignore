@@ -3,3 +3,6 @@ elm-stuff/
 .idea/
 Main.min.js
 dist-remote/
+node_modules/
+package-lock.json
+*.sh

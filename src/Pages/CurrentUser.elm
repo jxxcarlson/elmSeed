@@ -21,7 +21,7 @@ import OutsideInfo exposing (InfoForOutside(..))
 import Routing.Helpers exposing (Route(..), reverseRoute)
 import SharedState exposing (SharedState, SharedStateUpdate(..))
 import User.Session as Session
-import User.Types exposing (Msg(..), ReadingStat, State(..), User)
+import User.Types exposing (Msg(..), State(..), User)
 
 
 type alias Model =
@@ -117,7 +117,7 @@ update sharedState msg model =
 
         AcceptRegistration (Ok user) ->
             ( { model
-                | message = "Welcome to Booklib.io, " ++ user.username ++ "!"
+                | message = "Welcome to Logger.io, " ++ user.username ++ "!"
                 , username = ""
                 , email = ""
                 , password = ""
@@ -142,51 +142,16 @@ update sharedState msg model =
         SetState state ->
             ( { model | state = state }, Cmd.none, NoUpdate )
 
-        ToggleUserPublic flag ->
-            case sharedState.currentUser of
-                Nothing ->
-                    ( model, Cmd.none, NoUpdate )
-
-                Just user ->
-                    let
-                        nextUser =
-                            { user | public = flag }
-
-                        cmd =
-                            Session.updateUser nextUser nextUser.token
-                    in
-                    ( model, cmd, SharedState.UpdateCurrentUser (Just nextUser) )
-
-        InputTagString str ->
-            ( { model | tagString = str }, Cmd.none, NoUpdate )
-
-        UpdateUserTags ->
-            let
-                ( nextCurrentUser, cmd ) =
-                    case sharedState.currentUser of
-                        Nothing ->
-                            ( Nothing, Cmd.none )
-
-                        Just user ->
-                            let
-                                nextUser_ =
-                                    { user | tags = String.split "," model.tagString |> List.map String.trim }
-                            in
-                            ( Just nextUser_, Session.updateUser nextUser_ nextUser_.token )
-            in
-            ( model, cmd, SharedState.UpdateCurrentUser nextCurrentUser )
-
 
 view : SharedState -> Model -> Element Msg
 view sharedState model =
     case classifyDevice { width = sharedState.windowWidth, height = sharedState.windowHeight } |> .class of
         Phone ->
             column (Style.mainColumn fill fill)
-                [ showIf (model.state /= SignedIn) (row [] [ el [ Font.bold ] (text "Welcome to Booklib.io") ])
-                , showIf (model.state /= SignedIn) (row [ Font.size 14 ] [ el [] (text "Create and share your annotated book list") ])
+                [ showIf (model.state /= SignedIn) (row [] [ el [ Font.bold ] (text "Welcome to Logger.io") ])
                 , signInColumn sharedState model
-                , image [ width fill ]
-                    { src = "https://www.hastac.org/sites/default/files/upload/images/post/books.jpg"
+                , image [ width (px 400) ]
+                    { src = "https://cdn-images-1.medium.com/max/1600/1*e-unBvI-Sf9T73x43-ppqQ.png"
                     , description = "Library"
                     }
                 , infoLine
@@ -210,10 +175,9 @@ infoLine =
 welcomeColumn : SharedState -> Model -> Element Msg
 welcomeColumn sharedState model =
     column [ alignTop, spacing 10 ]
-        [ showIf (model.state /= SignedIn) (row [] [ el [ Font.bold ] (text "Welcome to Booklib.io") ])
-        , showIf (model.state /= SignedIn) (row [] [ el [] (text "Create and share your annotated book list") ])
-        , image []
-            { src = "https://www.hastac.org/sites/default/files/upload/images/post/books.jpg"
+        [ showIf (model.state /= SignedIn) (row [] [ el [ Font.bold ] (text "Welcome to Logger.io") ])
+        , image [ width (px 600) ]
+            { src = "https://cdn-images-1.medium.com/max/1600/1*e-unBvI-Sf9T73x43-ppqQ.png"
             , description = "Library"
             }
         ]
@@ -232,22 +196,11 @@ signInColumn sharedState model =
         , showIf (not <| showIfSignedInOrRegistered model) (row (registrationStyle sharedState) [ signInOrCancelButton sharedState model, registerButton model ])
         , showIf (showIfSignedInOrRegistered model) (signInOrCancelButton sharedState model)
         , messagePanel model
-        , showIf (showIfSignedInOrRegistered model) (publicCheckbox sharedState)
-        , tagSection sharedState model
         , showIf (not <| showIfSignedInOrRegistered model) (resetPasswordLink model)
         , verifyUserLink model
         , infoPanel sharedState model
         , tipLine
         ]
-
-
-tagSection sharedState model =
-    showIf (showIfSignedInOrRegistered model)
-        (column [ padding 12, spacing 8, Border.width 1 ]
-            [ tagInput sharedState model
-            , tagUpdateButton
-            ]
-        )
 
 
 tipLine =
@@ -299,32 +252,6 @@ registrationStyle sharedState =
             [ moveRight 125, spacing 12 ]
 
 
-tagInput sharedState model =
-    case classifyDevice { width = sharedState.windowWidth, height = sharedState.windowHeight } |> .class of
-        Phone ->
-            Input.text [ width (px 280), height (px 20), Font.size 14 ]
-                { text = model.tagString
-                , placeholder = Just <| Input.placeholder [ moveUp 6 ] (el [] (Element.text "history, ficton, science"))
-                , onChange = InputTagString
-                , label = Input.labelLeft [ Font.size 14, moveDown 5 ] (text "Tags ")
-                }
-
-        _ ->
-            Input.text [ width (px 400), height (px 20), Font.size 14 ]
-                { text = model.tagString
-                , placeholder = Just <| Input.placeholder [ moveUp 6 ] (el [] (Element.text "history, ficton, science"))
-                , onChange = InputTagString
-                , label = Input.labelLeft [ Font.size 14, moveDown 5 ] (text "Tags ")
-                }
-
-
-tagUpdateButton =
-    Input.button Style.smallButton
-        { onPress = Just UpdateUserTags
-        , label = el [ Font.size 12 ] (text "Update tags ")
-        }
-
-
 footer : SharedState -> Model -> Element Msg
 footer sharedState model =
     row Style.footer
@@ -359,22 +286,6 @@ inputEmail sharedState model =
         , placeholder = Nothing
         , label = inputLabel sharedState (inputLabelStyle sharedState) (text "Email")
         }
-
-
-publicCheckbox : SharedState -> Element Msg
-publicCheckbox sharedState =
-    case sharedState.currentUser of
-        Nothing ->
-            Element.none
-
-        Just user ->
-            Input.checkbox
-                []
-                { onChange = ToggleUserPublic
-                , icon = icon
-                , checked = user.public
-                , label = Input.labelLeft [ Font.size 16, moveDown 1 ] (text "Share your reading list?")
-                }
 
 
 icon : Bool -> Element msg

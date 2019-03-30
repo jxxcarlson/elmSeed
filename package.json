@@ -1,0 +1,7 @@
+{
+  "name": "elm-seed-project",
+  "version": "1.0.0",
+  "scripts": {
+    "api": "elm-graphql http://localhost:4000/graphiql --base Logger"
+  }
+}
