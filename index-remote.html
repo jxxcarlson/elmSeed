@@ -1,0 +1,99 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, minimal-ui">
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="google-site-verification" content="z2mLtsaAx2smLS7F69St8zfNqeCcdbkpvib0vmTPb2Q" />
+</head>
+
+
+<title>BookLib</title>
+<div id="main"></div>
+<script src="Main.min.js"></script>
+<script>
+    var root = document.getElementById('main');
+    var app = Elm.Main.init({node: root, flags:  {
+       width:  window.innerWidth,
+       height: window.innerHeight,
+       currentTime: Date.now()}
+     });
+
+
+        app.ports.infoForOutside.subscribe(msg => {
+
+          switch(msg.tag) {
+
+    		case "UserData":
+               processUserData(msg.data)
+               break;
+
+    		case "AskToReconnectUser":
+               askToReconnectUser(msg.data)
+               break;
+
+    		case "DisconnectUser":
+               disconnectUser()
+               break;
+          }
+
+       })  // End of app.ports.infoForOutside.subscribe
+
+       var disconnectUser = function () {
+         localStorage.clear()
+       }
+
+       var askToReconnectUser = function (str) {
+         console.log("JS, askToReconnectUser, arg = " + str)
+         app.ports.infoForElm.send({tag: "ReconnectUser", data: parseUserData()})
+       }
+
+       var parseUserData = function() {
+          console.log("JS, parsng user data")
+           var jsonThing = {
+    		   "token": localStorage.getItem("token"),
+    		   "email": localStorage.getItem("email"),
+    		   "id": localStorage.getItem("id"),
+    		   "username": localStorage.getItem("username"),
+               "blurb": localStorage.getItem("blurb"),
+    		   "firstname": localStorage.getItem("firstname"),
+               "public": localStorage.getItem("public"),
+               "follow": localStorage.getItem("follow"),
+               "followers": localStorage.getItem("followers"),
+               "admin": localStorage.getItem("admin"),
+               "beginningDate": localStorage.getItem("beginningDate"),
+               "tags": localStorage.getItem("tags"),
+               "reading_stats": localStorage.getItem("reading_stats"),
+               "verified": localStorage.getItem("verified"),
+
+
+
+    		 }
+    		    // console.log("jsonThing: " + JSON.stringify(jsonThing))
+            return jsonThing
+        }
+
+
+       var processUserData = function(userSettings) {
+         console.log("JS, processUserData")
+           localStorage.clear()
+           localStorage.setItem("token", userSettings.token);
+    	   localStorage.setItem("email", userSettings.email);
+    	   localStorage.setItem("id", userSettings.id);
+    	   localStorage.setItem("username", userSettings.username);
+           localStorage.setItem("blurb", userSettings.blurb);
+    	   localStorage.setItem("firstname", userSettings.firstname);
+           localStorage.setItem("public", userSettings.public);
+           localStorage.setItem("follow", userSettings.follow);
+           localStorage.setItem("followers", userSettings.followers);
+           localStorage.setItem("admin", userSettings.admin);
+           localStorage.setItem("beginningDate", userSettings.beginningDate);
+           localStorage.setItem("tags", userSettings.tags);
+           localStorage.setItem("reading_stats", userSettings.reading_stats);
+           localStorage.setItem("verified", userSettings.verified);
+       }
+
+
+</script>
+</body>
