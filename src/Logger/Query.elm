@@ -2,7 +2,7 @@
 -- https://github.com/dillonkearns/elm-graphql
 
 
-module Logger.Query exposing (GetUserRequiredArguments, LogsForUserRequiredArguments, getUser, listEvents, listLogs, listUsers, logsForUser)
+module Logger.Query exposing (GetUserRequiredArguments, ListEventsForLogRequiredArguments, LogsForUserRequiredArguments, getUser, listEvents, listEventsForLog, listLogs, listUsers, logsForUser)
 
 import Graphql.Internal.Builder.Argument as Argument exposing (Argument)
 import Graphql.Internal.Builder.Object as Object
@@ -31,6 +31,15 @@ getUser requiredArgs object_ =
 listEvents : SelectionSet decodesTo Logger.Object.Event -> SelectionSet (List decodesTo) RootQuery
 listEvents object_ =
     Object.selectionForCompositeField "listEvents" [] object_ (identity >> Decode.list)
+
+
+type alias ListEventsForLogRequiredArguments =
+    { logId : Int }
+
+
+listEventsForLog : ListEventsForLogRequiredArguments -> SelectionSet decodesTo Logger.Object.Event -> SelectionSet (List decodesTo) RootQuery
+listEventsForLog requiredArgs object_ =
+    Object.selectionForCompositeField "listEventsForLog" [ Argument.required "logId" requiredArgs.logId Encode.int ] object_ (identity >> Decode.list)
 
 
 listLogs : SelectionSet decodesTo Logger.Object.Log -> SelectionSet (List decodesTo) RootQuery

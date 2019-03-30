@@ -180,7 +180,7 @@ mainView msgMapper sharedState model =
                 , pageView sharedState model
                 ]
     in
-    { title = "BookLib"
+    { title = "Logger"
     , body = body_ |> Element.layoutWith { options = [ Style.myFocusStyle ] } [] |> Html.map msgMapper |> (\x -> [ x ])
     }
 

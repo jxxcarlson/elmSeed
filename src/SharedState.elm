@@ -1,4 +1,12 @@
-module SharedState exposing (SharedAppState(..), SharedState, SharedStateUpdate(..), initialSharedState, update)
+module SharedState exposing
+    ( Event
+    , Log
+    , SharedAppState(..)
+    , SharedState
+    , SharedStateUpdate(..)
+    , initialSharedState
+    , update
+    )
 
 import Browser.Navigation
 import Logger.Enum.LogTypeValue exposing (LogTypeValue(..))
@@ -29,7 +37,6 @@ type alias Log =
 
 type alias Event =
     { id : Int
-    , log_id : Int
     , value : String
     }
 
@@ -46,6 +53,7 @@ type SharedStateUpdate
     | UpdateCurrentUser (Maybe User)
     | InvalidateCurrentUser
     | UpdateSharedAppState SharedAppState
+    | UpdateSharedEventList (List Event)
 
 
 initialSharedState : Browser.Navigation.Key -> Posix -> Int -> Int -> Maybe User -> SharedState
@@ -75,6 +83,9 @@ update sharedState sharedStateUpdate =
 
         UpdateSharedAppState appState ->
             { sharedState | appState = appState }
+
+        UpdateSharedEventList eventList ->
+            { sharedState | currentEventList = Just eventList }
 
         NoUpdate ->
             sharedState
