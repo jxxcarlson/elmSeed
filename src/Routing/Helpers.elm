@@ -6,6 +6,7 @@ import Url.Parser exposing ((</>))
 
 type Route
     = CurrentUserRoute
+    | LogsRoute
     | NotFoundRoute
 
 
@@ -15,6 +16,9 @@ reverseRoute route =
         CurrentUserRoute ->
             "#/"
 
+        LogsRoute ->
+            "#/logs"
+
         _ ->
             "#/"
 
@@ -22,8 +26,7 @@ reverseRoute route =
 routeParser =
     Url.Parser.oneOf
         [ Url.Parser.map CurrentUserRoute Url.Parser.top
-
-        --, Url.Parser.map BooksRoute (Url.Parser.s "books")
+        , Url.Parser.map LogsRoute (Url.Parser.s "logs")
         ]
 
 
