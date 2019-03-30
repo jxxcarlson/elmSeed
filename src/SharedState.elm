@@ -10,6 +10,7 @@ module SharedState exposing
 
 import Browser.Navigation
 import Logger.Enum.LogTypeValue exposing (LogTypeValue(..))
+import Logger.Scalar exposing (NaiveDateTime(..))
 import Time exposing (Posix)
 import User.Types exposing (User, testUser)
 
@@ -38,6 +39,7 @@ type alias Log =
 type alias Event =
     { id : Int
     , value : String
+    , insertedAt : NaiveDateTime
     }
 
 

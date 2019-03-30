@@ -19,6 +19,7 @@ import Graphql.SelectionSet as SelectionSet exposing (SelectionSet, with)
 import Logger.Object
 import Logger.Object.Event
 import Logger.Query as Query
+import Logger.Scalar exposing (NaiveDateTime(..))
 import SharedState exposing (Event, Log, SharedState, SharedStateUpdate(..))
 
 
@@ -56,11 +57,69 @@ update sharedState msg model =
 view : SharedState -> Model -> Element Msg
 view sharedState model =
     column (Style.mainColumn fill fill ++ [ padding 40, Background.color (Style.makeGrey 0.8) ])
-        [ row [ spacing 20 ]
-            [ el [] (text "LOGS!!")
-            , testButton
-            ]
+        [ logPanel sharedState model
         ]
+
+
+logPanel : SharedState -> Model -> Element Msg
+logPanel sharedState model =
+    column [ spacing 20, height (px 490), width (px 300) ]
+        [ el [] (text "LOGS")
+        , viewLog sharedState model
+        , testButton
+        ]
+
+
+viewLog : SharedState -> Model -> Element Msg
+viewLog sharedState model =
+    case sharedState.currentEventList of
+        Nothing ->
+            column [ height (px 400) ] [ text "No logs available" ]
+
+        Just events ->
+            indexedTable [ spacing 4, Font.size 12 ]
+                { data = events
+                , columns =
+                    [ { header = el [ Font.bold ] (text "k")
+                      , width = px 40
+                      , view = \k event -> el [ Font.size 12 ] (text <| String.fromInt <| k + 1)
+                      }
+                    , { header = el [ Font.bold ] (text "Date")
+                      , width = px 80
+                      , view = \k event -> el [ Font.size 12 ] (text <| dateStringOfNaiveDateTime <| event.insertedAt)
+                      }
+                    , { header = el [ Font.bold ] (text "Time")
+                      , width = px 80
+                      , view = \k event -> el [ Font.size 12 ] (text <| timeStringOfNaiveDateTime <| event.insertedAt)
+                      }
+                    , { header = el [ Font.bold ] (text "value")
+                      , width = px 40
+                      , view = \k event -> el [ Font.size 12 ] (text <| event.value)
+                      }
+                    ]
+                }
+
+
+stringValueOfNaiveDateTime : NaiveDateTime -> String
+stringValueOfNaiveDateTime (NaiveDateTime str) =
+    str
+
+
+dateStringOfNaiveDateTime : NaiveDateTime -> String
+dateStringOfNaiveDateTime (NaiveDateTime str) =
+    str
+        |> String.split "T"
+        |> List.head
+        |> Maybe.withDefault "-"
+
+
+timeStringOfNaiveDateTime : NaiveDateTime -> String
+timeStringOfNaiveDateTime (NaiveDateTime str) =
+    str
+        |> String.split "T"
+        |> List.reverse
+        |> List.head
+        |> Maybe.withDefault "-"
 
 
 testButton : Element Msg
@@ -84,9 +143,10 @@ query logId =
 
 eventSelection : SelectionSet Event Logger.Object.Event
 eventSelection =
-    SelectionSet.map2 Event
+    SelectionSet.map3 Event
         Logger.Object.Event.id
         Logger.Object.Event.value
+        Logger.Object.Event.insertedAt
 
 
 type alias EventListResponse =
