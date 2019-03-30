@@ -22,13 +22,13 @@ import Logger.Union
 
 type alias CreateEventRequiredArguments =
     { logId : Int
-    , value : Float
+    , value : String
     }
 
 
 createEvent : CreateEventRequiredArguments -> SelectionSet decodesTo Logger.Object.Event -> SelectionSet (Maybe decodesTo) RootMutation
 createEvent requiredArgs object_ =
-    Object.selectionForCompositeField "createEvent" [ Argument.required "logId" requiredArgs.logId Encode.int, Argument.required "value" requiredArgs.value Encode.float ] object_ (identity >> Decode.nullable)
+    Object.selectionForCompositeField "createEvent" [ Argument.required "logId" requiredArgs.logId Encode.int, Argument.required "value" requiredArgs.value Encode.string ] object_ (identity >> Decode.nullable)
 
 
 type alias CreateLogRequiredArguments =

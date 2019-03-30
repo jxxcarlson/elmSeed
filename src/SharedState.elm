@@ -23,6 +23,7 @@ type alias SharedState =
     , appState : SharedAppState
     , currentUser : Maybe User
     , currentLog : Maybe Log
+    , currentLogList : Maybe (List Log)
     , currentEventList : Maybe (List Event)
     }
 
@@ -31,8 +32,9 @@ type alias Log =
     { id : Int
     , name : String
     , userId : Int
-    , logType : LogTypeValue
-    , events : List Event
+
+    --, logType : String
+    -- , events : List Event
     }
 
 
@@ -55,6 +57,8 @@ type SharedStateUpdate
     | UpdateCurrentUser (Maybe User)
     | InvalidateCurrentUser
     | UpdateSharedAppState SharedAppState
+    | UpdateSharedLogList (List Log)
+    | UpdateCurrentLog (Maybe Log)
     | UpdateSharedEventList (List Event)
 
 
@@ -67,6 +71,7 @@ initialSharedState navKey time w h currentUser =
     , appState = SharedStateReady
     , currentUser = Just testUser
     , currentLog = Nothing
+    , currentLogList = Nothing
     , currentEventList = Nothing
     }
 
@@ -86,8 +91,14 @@ update sharedState sharedStateUpdate =
         UpdateSharedAppState appState ->
             { sharedState | appState = appState }
 
+        UpdateSharedLogList logs ->
+            { sharedState | currentLogList = Just logs }
+
         UpdateSharedEventList eventList ->
             { sharedState | currentEventList = Just eventList }
+
+        UpdateCurrentLog maybeLog ->
+            { sharedState | currentLog = maybeLog }
 
         NoUpdate ->
             sharedState

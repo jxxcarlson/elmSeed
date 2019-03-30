@@ -50,10 +50,10 @@ tableHeading =
 
 titleButton highlighted =
     if highlighted then
-        [ Font.color orange ]
+        [ Font.color darkRed, Font.bold ]
 
     else
-        [ Font.color white ]
+        [ Font.color darkBlue ]
 
 
 titleButton2 highlighted =
@@ -307,6 +307,10 @@ darkBlue =
 
 orange =
     Element.rgb 1.0 0.7 0.0549
+
+
+darkOrange =
+    Element.rgb 0.8 0.5 0.0549
 
 
 lightOrange =
