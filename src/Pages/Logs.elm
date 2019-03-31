@@ -28,12 +28,14 @@ import Logger.Object.Log
 import Logger.Query as Query
 import Logger.Scalar exposing (NaiveDateTime(..))
 import SharedState exposing (Event, Log, SharedState, SharedStateUpdate(..))
+import Utility.Data as Data
 import Utility.DateTime exposing (offsetDateTimeStringByHours, rataDieFromNaiveDateTime)
 
 
 type alias Model =
     { message : String
     , valueString : String
+    , filterState : FilterState
     }
 
 
@@ -41,6 +43,7 @@ initModel : Model
 initModel =
     { message = "Nothing yet."
     , valueString = ""
+    , filterState = NoFilter
     }
 
 
@@ -48,6 +51,11 @@ initModel =
 --
 -- MSG
 --
+
+
+type FilterState
+    = NoFilter
+    | FilterByDay
 
 
 type Msg
@@ -59,6 +67,7 @@ type Msg
     | EventCreated (Result (Graphql.Http.Error (Maybe Event)) (Maybe Event))
     | MakeEvent
     | GotValueString String
+    | SetFilter FilterState
 
 
 update : SharedState -> Msg -> Model -> ( Model, Cmd Msg, SharedStateUpdate )
@@ -123,6 +132,9 @@ update sharedState msg model =
                     , NoUpdate
                     )
 
+        SetFilter filterState ->
+            ( { model | filterState = filterState }, Cmd.none, NoUpdate )
+
 
 view : SharedState -> Model -> Element Msg
 view sharedState model =
@@ -131,8 +143,13 @@ view sharedState model =
             [ logListPanel sharedState model
             , eventsPanel sharedState model
             ]
-        , row [ spacing 280, alignBottom ]
-            [ getLogsButton
+        , row [ spacing 160, alignBottom ]
+            [ row [ spacing 12 ]
+                [ getLogsButton
+                , el [ Font.size 12 ] (text "Filters")
+                , noFilterButton model
+                , filterByDayButton model
+                ]
             , row [ spacing 12 ] [ inputValue model, submitEventButton ]
             ]
         ]
@@ -181,6 +198,22 @@ logNameButton currentLog log =
         }
 
 
+noFilterButton : Model -> Element Msg
+noFilterButton model =
+    Input.button (Style.activeButton (model.filterState == NoFilter))
+        { onPress = Just (SetFilter NoFilter)
+        , label = Element.text "None"
+        }
+
+
+filterByDayButton : Model -> Element Msg
+filterByDayButton model =
+    Input.button (Style.activeButton (model.filterState == FilterByDay))
+        { onPress = Just (SetFilter FilterByDay)
+        , label = Element.text "By day"
+        }
+
+
 eventsPanel : SharedState -> Model -> Element Msg
 eventsPanel sharedState model =
     column [ spacing 20, height (px 490), width (px 400), Border.width 1 ]
@@ -196,10 +229,18 @@ viewEvents sharedState model =
                 [ el [ Font.size 16, Font.bold ] (text "No events available")
                 ]
 
-        Just events ->
+        Just events_ ->
             let
                 eventSum_ =
-                    eventSum events
+                    eventSum events_
+
+                events =
+                    case model.filterState of
+                        NoFilter ->
+                            Data.correctTimeZone -5 events_
+
+                        FilterByDay ->
+                            Data.eventsByDay -5 events_
             in
             column [ spacing 12, padding 20, height (px 480) ]
                 [ el [ Font.size 16, Font.bold ] (text "Events")
@@ -212,15 +253,15 @@ viewEvents sharedState model =
                           }
                         , { header = el [ Font.bold ] (text "RD")
                           , width = px 40
-                          , view = \k event -> el [ Font.size 12 ] (text <| String.fromInt <| (\x -> x - 737147) <| rataDieFromNaiveDateTime <| offsetDateTimeStringByHours -5 <| (\(NaiveDateTime str) -> str) <| event.insertedAt)
+                          , view = \k event -> el [ Font.size 12 ] (text <| String.fromInt <| (\x -> x - 737147) <| rataDieFromNaiveDateTime <| (\(NaiveDateTime str) -> str) <| event.insertedAt)
                           }
                         , { header = el [ Font.bold ] (text "Date")
                           , width = px 80
-                          , view = \k event -> el [ Font.size 12 ] (text <| dateStringOfDateTimeString <| offsetDateTimeStringByHours -5 <| (\(NaiveDateTime str) -> str) <| event.insertedAt)
+                          , view = \k event -> el [ Font.size 12 ] (text <| dateStringOfDateTimeString <| (\(NaiveDateTime str) -> str) <| event.insertedAt)
                           }
                         , { header = el [ Font.bold ] (text "Time")
                           , width = px 80
-                          , view = \k event -> el [ Font.size 12 ] (text <| timeStringOfDateTimeString <| offsetDateTimeStringByHours -5 <| (\(NaiveDateTime str) -> str) <| event.insertedAt)
+                          , view = \k event -> el [ Font.size 12 ] (text <| timeStringOfDateTimeString <| (\(NaiveDateTime str) -> str) <| event.insertedAt)
                           }
                         , { header = el [ Font.bold ] (text "Value")
                           , width = px 40
@@ -238,11 +279,6 @@ viewEvents sharedState model =
 fixDate : NaiveDateTime -> String
 fixDate (NaiveDateTime dateString) =
     offsetDateTimeStringByHours -5 dateString
-
-
-rataDie : NaiveDateTime -> Int
-rataDie (NaiveDateTime str) =
-    rataDieFromNaiveDateTime str - 737148
 
 
 eventSum : List Event -> Float
