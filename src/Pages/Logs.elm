@@ -1,6 +1,7 @@
 module Pages.Logs exposing
     ( Model
     , Msg(..)
+    , getLogs
     , initModel
     , update
     , view
@@ -125,7 +126,7 @@ update sharedState msg model =
 
 view : SharedState -> Model -> Element Msg
 view sharedState model =
-    column (Style.mainColumn fill fill ++ [ spacing 12, padding 40, Background.color (Style.makeGrey 0.8) ])
+    column (Style.mainColumn fill fill ++ [ spacing 12, padding 40, Background.color (Style.makeGrey 0.9) ])
         [ row [ spacing 12 ]
             [ logListPanel sharedState model
             , eventsPanel sharedState model
@@ -325,7 +326,7 @@ inputValue model =
 
 
 inputStyle =
-    [ width (px 60), height (px 30), Background.color (Style.makeGrey 0.3), Font.color Style.white, Font.size 12 ]
+    [ width (px 60), height (px 30), Background.color (Style.makeGrey 0.4), Font.color Style.white, Font.size 12 ]
 
 
 

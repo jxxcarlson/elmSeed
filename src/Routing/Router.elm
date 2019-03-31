@@ -61,6 +61,14 @@ update sharedState msg model =
                                 ( _, _ ) ->
                                     Cmd.none
 
+                        LogsRoute ->
+                            case sharedState.currentUser of
+                                Nothing ->
+                                    Cmd.none
+
+                                Just user ->
+                                    Cmd.map LogMsg (Logs.getLogs user.id)
+
                         _ ->
                             Cmd.none
 
