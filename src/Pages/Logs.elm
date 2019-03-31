@@ -27,6 +27,7 @@ import Logger.Object.Log
 import Logger.Query as Query
 import Logger.Scalar exposing (NaiveDateTime(..))
 import SharedState exposing (Event, Log, SharedState, SharedStateUpdate(..))
+import Utility.DateTime exposing (offsetDateTimeStringByHours, rataDieFromNaiveDateTime)
 
 
 type alias Model =
@@ -50,7 +51,7 @@ initModel =
 
 type Msg
     = NoOp
-    | GetLogs Int
+    | GetLogs
     | GotLogs (Result (Graphql.Http.Error LogListResponse) LogListResponse)
     | GetEvents Int
     | GotEvents (Result (Graphql.Http.Error EventListResponse) EventListResponse)
@@ -65,8 +66,13 @@ update sharedState msg model =
         NoOp ->
             ( model, Cmd.none, NoUpdate )
 
-        GetLogs userId ->
-            ( model, getLogs userId, NoUpdate )
+        GetLogs ->
+            case sharedState.currentUser of
+                Nothing ->
+                    ( { model | message = "No user signed in" }, Cmd.none, NoUpdate )
+
+                Just user ->
+                    ( model, getLogs user.id, NoUpdate )
 
         GotLogs (Ok logs) ->
             ( { model | message = "Logs received" }, Cmd.none, UpdateSharedLogList logs )
@@ -124,7 +130,10 @@ view sharedState model =
             [ logListPanel sharedState model
             , eventsPanel sharedState model
             ]
-        , row [ spacing 12, alignBottom ] [ getLogsButton, inputValue model, submitEventButton ]
+        , row [ spacing 280, alignBottom ]
+            [ getLogsButton
+            , row [ spacing 12 ] [ inputValue model, submitEventButton ]
+            ]
         ]
 
 
@@ -173,7 +182,7 @@ logNameButton currentLog log =
 
 eventsPanel : SharedState -> Model -> Element Msg
 eventsPanel sharedState model =
-    column [ spacing 20, height (px 490), width (px 300), Border.width 1 ]
+    column [ spacing 20, height (px 490), width (px 400), Border.width 1 ]
         [ viewEvents sharedState model
         ]
 
@@ -182,7 +191,7 @@ viewEvents : SharedState -> Model -> Element Msg
 viewEvents sharedState model =
     case sharedState.currentEventList of
         Nothing ->
-            column [ spacing 12, padding 20, height (px 400) ]
+            column [ spacing 12, padding 20, height (px 500) ]
                 [ el [ Font.size 16, Font.bold ] (text "No events available")
                 ]
 
@@ -191,7 +200,7 @@ viewEvents sharedState model =
                 eventSum_ =
                     eventSum events
             in
-            column [ spacing 12, padding 20, height (px 400) ]
+            column [ spacing 12, padding 20, height (px 480) ]
                 [ el [ Font.size 16, Font.bold ] (text "Events")
                 , indexedTable [ spacing 4, Font.size 12 ]
                     { data = events
@@ -200,13 +209,17 @@ viewEvents sharedState model =
                           , width = px 40
                           , view = \k event -> el [ Font.size 12 ] (text <| String.fromInt <| k + 1)
                           }
+                        , { header = el [ Font.bold ] (text "RD")
+                          , width = px 40
+                          , view = \k event -> el [ Font.size 12 ] (text <| String.fromInt <| (\x -> x - 737147) <| rataDieFromNaiveDateTime <| offsetDateTimeStringByHours -5 <| (\(NaiveDateTime str) -> str) <| event.insertedAt)
+                          }
                         , { header = el [ Font.bold ] (text "Date")
                           , width = px 80
-                          , view = \k event -> el [ Font.size 12 ] (text <| dateStringOfNaiveDateTime <| event.insertedAt)
+                          , view = \k event -> el [ Font.size 12 ] (text <| dateStringOfDateTimeString <| offsetDateTimeStringByHours -5 <| (\(NaiveDateTime str) -> str) <| event.insertedAt)
                           }
                         , { header = el [ Font.bold ] (text "Time")
                           , width = px 80
-                          , view = \k event -> el [ Font.size 12 ] (text <| timeStringOfNaiveDateTime <| event.insertedAt)
+                          , view = \k event -> el [ Font.size 12 ] (text <| timeStringOfDateTimeString <| offsetDateTimeStringByHours -5 <| (\(NaiveDateTime str) -> str) <| event.insertedAt)
                           }
                         , { header = el [ Font.bold ] (text "Value")
                           , width = px 40
@@ -219,6 +232,16 @@ viewEvents sharedState model =
                     , el [ Font.size 12 ] (text <| "Hours: " ++ String.fromFloat (Utility.roundTo 1 (eventSum_ / 60)))
                     ]
                 ]
+
+
+fixDate : NaiveDateTime -> String
+fixDate (NaiveDateTime dateString) =
+    offsetDateTimeStringByHours -5 dateString
+
+
+rataDie : NaiveDateTime -> Int
+rataDie (NaiveDateTime str) =
+    rataDieFromNaiveDateTime str - 737148
 
 
 eventSum : List Event -> Float
@@ -251,10 +274,27 @@ timeStringOfNaiveDateTime (NaiveDateTime str) =
         |> Maybe.withDefault "-"
 
 
+dateStringOfDateTimeString : String -> String
+dateStringOfDateTimeString str =
+    str
+        |> String.split "T"
+        |> List.head
+        |> Maybe.withDefault "-"
+
+
+timeStringOfDateTimeString : String -> String
+timeStringOfDateTimeString str =
+    str
+        |> String.split "T"
+        |> List.reverse
+        |> List.head
+        |> Maybe.withDefault "-"
+
+
 getLogsButton : Element Msg
 getLogsButton =
     Input.button Style.button
-        { onPress = Just (GetLogs 1)
+        { onPress = Just GetLogs
         , label = el [ Font.size 14 ] (text "Get logs")
         }
 

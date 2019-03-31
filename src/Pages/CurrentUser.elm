@@ -150,7 +150,7 @@ view sharedState model =
             column (Style.mainColumn fill fill)
                 [ showIf (model.state /= SignedIn) (row [] [ el [ Font.bold ] (text "Welcome to Logger.io") ])
                 , signInColumn sharedState model
-                , image [ width (px 400) ]
+                , image [ height (px (sharedState.windowHeight - 100)) ]
                     { src = "https://cdn-images-1.medium.com/max/1600/1*e-unBvI-Sf9T73x43-ppqQ.png"
                     , description = "Library"
                     }
@@ -176,7 +176,7 @@ welcomeColumn : SharedState -> Model -> Element Msg
 welcomeColumn sharedState model =
     column [ alignTop, spacing 10 ]
         [ showIf (model.state /= SignedIn) (row [] [ el [ Font.bold ] (text "Welcome to Logger.io") ])
-        , image [ width (px 600) ]
+        , image [ width (px 800) ]
             { src = "https://cdn-images-1.medium.com/max/1600/1*e-unBvI-Sf9T73x43-ppqQ.png"
             , description = "Library"
             }
@@ -199,7 +199,8 @@ signInColumn sharedState model =
         , showIf (not <| showIfSignedInOrRegistered model) (resetPasswordLink model)
         , verifyUserLink model
         , infoPanel sharedState model
-        , tipLine
+
+        -- , tipLine
         ]
 
 
