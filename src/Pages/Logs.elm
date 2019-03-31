@@ -7,6 +7,8 @@ module Pages.Logs exposing
     , view
     )
 
+--
+
 import Common.Style as Style
 import Common.Utility as Utility
 import Configuration
@@ -20,6 +22,21 @@ import Graphql.Operation exposing (RootQuery)
 import Graphql.OptionalArgument exposing (OptionalArgument(..))
 import Graphql.SelectionSet as SelectionSet exposing (SelectionSet, with)
 import Json.Decode as Decode exposing (Decoder)
+import LineChart
+import LineChart.Area as Area
+import LineChart.Axis as Axis
+import LineChart.Axis.Intersection as Intersection
+import LineChart.Axis.Tick as Tick
+import LineChart.Axis.Ticks as Ticks
+import LineChart.Colors as Colors
+import LineChart.Container as Container
+import LineChart.Dots as Dots
+import LineChart.Events as Events
+import LineChart.Grid as Grid
+import LineChart.Interpolation as Interpolation
+import LineChart.Junk as Junk
+import LineChart.Legends as Legends
+import LineChart.Line as Line
 import Logger.Enum.LogTypeValue as LogTypeValue exposing (LogTypeValue(..))
 import Logger.Mutation as Mutation exposing (CreateEventRequiredArguments, CreateLogRequiredArguments, createEvent, createLog)
 import Logger.Object
@@ -142,8 +159,9 @@ view sharedState model =
         [ row [ spacing 12 ]
             [ logListPanel sharedState model
             , eventsPanel sharedState model
+            , chart sharedState model
             ]
-        , row [ spacing 160, alignBottom ]
+        , row [ spacing 100, alignBottom ]
             [ row [ spacing 12 ]
                 [ getLogsButton
                 , el [ Font.size 12 ] (text "Filters")
@@ -157,7 +175,7 @@ view sharedState model =
 
 logListPanel : SharedState -> Model -> Element Msg
 logListPanel sharedState model =
-    column [ spacing 20, height (px 490), width (px 300), Border.width 1 ]
+    column [ spacing 20, height (px 490), width (px 200), Border.width 1 ]
         [ viewLogs sharedState model
         ]
 
@@ -216,7 +234,7 @@ filterByDayButton model =
 
 eventsPanel : SharedState -> Model -> Element Msg
 eventsPanel sharedState model =
-    column [ spacing 20, height (px 490), width (px 400), Border.width 1 ]
+    column [ spacing 20, height (px 490), width (px 350), Border.width 1 ]
         [ viewEvents sharedState model
         ]
 
@@ -478,3 +496,68 @@ getEvents logId =
 query1 : SelectionSet () RootQuery
 query1 =
     SelectionSet.empty
+
+
+
+--
+-- Chart
+--
+
+
+chart : SharedState -> Model -> Element msg
+chart sharedState model =
+    case sharedState.currentEventList of
+        Nothing ->
+            Element.none
+
+        Just eventList_ ->
+            let
+                events =
+                    case model.filterState of
+                        NoFilter ->
+                            Data.correctTimeZone -5 eventList_
+
+                        FilterByDay ->
+                            Data.eventsByDay -5 eventList_
+            in
+            column [ Font.size 12 ]
+                [ LineChart.viewCustom chartConfig
+                    [ LineChart.line Colors.blue Dots.square "Events" (prepareData events) ]
+                    |> Element.html
+                ]
+
+
+prepareData : List Event -> List Data
+prepareData eventList =
+    eventList
+        |> List.map .value
+        |> List.indexedMap Tuple.pair
+        |> List.map dataFromPair
+
+
+dataFromPair : ( Int, String ) -> Data
+dataFromPair ( a, b ) =
+    { index = toFloat a, value = String.toFloat b |> Maybe.withDefault 0 }
+
+
+type alias Data =
+    { index : Float
+    , value : Float
+    }
+
+
+chartConfig : LineChart.Config Data msg
+chartConfig =
+    { x = Axis.full 800 "index" .index
+    , y = Axis.full 400 "Value" .value
+    , container = Container.default "line-chart-1"
+    , interpolation = Interpolation.monotone
+    , intersection = Intersection.default
+    , legends = Legends.none
+    , events = Events.default
+    , junk = Junk.default
+    , grid = Grid.default
+    , area = Area.stacked 0.3 -- Changed from the default!
+    , line = Line.wider 2
+    , dots = Dots.default
+    }
