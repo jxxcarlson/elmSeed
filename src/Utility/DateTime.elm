@@ -12,46 +12,11 @@ import Parser exposing (..)
 import Time
 
 
-type alias DT =
-    { year : Int
-    , month : Int
-    , day : Int
-    , hour : Int
-    , minute : Int
-    , second : Int
-    }
-
-
 type alias TR =
     { hour : Int
     , minute : Int
     , second : Int
     }
-
-
-epoch =
-    719163
-
-
-parseDT : Parser DT
-parseDT =
-    succeed DT
-        |= (parseUntil '-' |> Parser.map strToInt)
-        |. symbol "-"
-        |. chompWhile (\c -> c == '0')
-        |= (parseUntil '-' |> Parser.map strToInt)
-        |. symbol "-"
-        |. chompWhile (\c -> c == '0')
-        |= (parseUntil 'T' |> Parser.map strToInt)
-        |. symbol "T"
-        |. chompWhile (\c -> c == '0')
-        |= (parseUntil ':' |> Parser.map strToInt)
-        |. symbol ":"
-        |. chompWhile (\c -> c == '0')
-        |= (parseUntil ':' |> Parser.map strToInt)
-        |. symbol ":"
-        |. chompWhile (\c -> c == '0')
-        |= (parseUntil '.' |> Parser.map strToInt)
 
 
 parseTR : Parser TR
@@ -64,25 +29,6 @@ parseTR =
         |. symbol ":"
         |. chompWhile (\c -> c == '0')
         |= (parseUntil '.' |> Parser.map strToInt)
-
-
-offsetDateTimeByHours : Int -> DT -> DT
-offsetDateTimeByHours h dt =
-    let
-        newHours =
-            dt.hour + h
-    in
-    if newHours >= 24 then
-        { dt | day = dt.day + 1, hour = newHours - 24 }
-
-    else if newHours > 0 then
-        { dt | hour = newHours }
-
-    else if newHours == 0 && (dt.minute > 0 || dt.second > 0) then
-        { dt | hour = newHours }
-
-    else
-        { dt | day = max 1 (dt.day - 1), hour = newHours + 24 }
 
 
 offsetTRByHours : Int -> TR -> TR
@@ -129,36 +75,6 @@ offsetDateTimeStringByHours k str =
     shiftedDateString ++ "T" ++ shiftedTimeString
 
 
-stringValueOfDT : DT -> String
-stringValueOfDT dt =
-    let
-        y =
-            String.fromInt dt.year
-
-        m =
-            String.padLeft 2 '0' <| String.fromInt dt.month
-
-        d =
-            String.padLeft 2 '0' <| String.fromInt dt.day
-
-        h =
-            String.padLeft 2 '0' <| String.fromInt dt.hour
-
-        min =
-            String.padLeft 2 '0' <| String.fromInt dt.minute
-
-        s =
-            String.padLeft 2 '0' <| String.fromInt dt.second
-
-        datePart =
-            String.join "-" [ y, m, d ]
-
-        timePart =
-            String.join ":" [ h, min, s ]
-    in
-    datePart ++ "T" ++ timePart
-
-
 stringValueOfTR : TR -> String
 stringValueOfTR tr =
     let
@@ -179,11 +95,6 @@ strToInt str =
     str
         |> String.toInt
         |> Maybe.withDefault 0
-
-
-removePrefix : String -> String -> String
-removePrefix prefix str =
-    String.dropLeft (String.length prefix) str
 
 
 parseUntil : Char -> Parser String
