@@ -121,7 +121,7 @@ update sharedState msg model =
                     ( { model | message = "Event could not be created" }, Cmd.none, NoUpdate )
 
                 ( Just event, Just eventList ) ->
-                    ( { model | message = "Event  created" }, Cmd.none, UpdateSharedEventList (event :: eventList) )
+                    ( { model | message = "Event  created" }, Cmd.none, UpdateSharedEventList (eventList ++ [ event ]) )
 
                 ( _, _ ) ->
                     ( { model | message = "Oops!" }, Cmd.none, NoUpdate )
