@@ -79,6 +79,7 @@ type Msg
     = NoOp
     | GetLogs
     | GotLogs (Result (Graphql.Http.Error LogListResponse) LogListResponse)
+    | LogCreated (Result (Graphql.Http.Error (Maybe Log)) (Maybe Log))
     | GetEvents Int
     | GotEvents (Result (Graphql.Http.Error EventListResponse) EventListResponse)
     | EventCreated (Result (Graphql.Http.Error (Maybe Event)) (Maybe Event))
@@ -91,6 +92,12 @@ update : SharedState -> Msg -> Model -> ( Model, Cmd Msg, SharedStateUpdate )
 update sharedState msg model =
     case msg of
         NoOp ->
+            ( model, Cmd.none, NoUpdate )
+
+        LogCreated (Ok log) ->
+            ( model, Cmd.none, NoUpdate )
+
+        LogCreated (Err _) ->
             ( model, Cmd.none, NoUpdate )
 
         GetLogs ->
@@ -265,11 +272,11 @@ viewEvents sharedState model =
                 , indexedTable [ spacing 4, Font.size 12 ]
                     { data = events
                     , columns =
-                        [ { header = el [ Font.bold ] (text "k")
+                        [ { header = el [ Font.bold ] (text "index")
                           , width = px 40
                           , view = \k event -> el [ Font.size 12 ] (text <| String.fromInt <| k + 1)
                           }
-                        , { header = el [ Font.bold ] (text "RD")
+                        , { header = el [ Font.bold ] (text "Day")
                           , width = px 40
                           , view = \k event -> el [ Font.size 12 ] (text <| String.fromInt <| (\x -> x - 737147) <| rataDieFromNaiveDateTime <| (\(NaiveDateTime str) -> str) <| event.insertedAt)
                           }
@@ -294,39 +301,12 @@ viewEvents sharedState model =
                 ]
 
 
-fixDate : NaiveDateTime -> String
-fixDate (NaiveDateTime dateString) =
-    offsetDateTimeStringByHours -5 dateString
-
-
 eventSum : List Event -> Float
 eventSum eventList =
     eventList
         |> List.map .value
         |> List.map (\str -> String.toFloat str |> Maybe.withDefault 0)
         |> List.sum
-
-
-stringValueOfNaiveDateTime : NaiveDateTime -> String
-stringValueOfNaiveDateTime (NaiveDateTime str) =
-    str
-
-
-dateStringOfNaiveDateTime : NaiveDateTime -> String
-dateStringOfNaiveDateTime (NaiveDateTime str) =
-    str
-        |> String.split "T"
-        |> List.head
-        |> Maybe.withDefault "-"
-
-
-timeStringOfNaiveDateTime : NaiveDateTime -> String
-timeStringOfNaiveDateTime (NaiveDateTime str) =
-    str
-        |> String.split "T"
-        |> List.reverse
-        |> List.head
-        |> Maybe.withDefault "-"
 
 
 dateStringOfDateTimeString : String -> String
@@ -346,19 +326,17 @@ timeStringOfDateTimeString str =
         |> Maybe.withDefault "-"
 
 
+
+--
+-- BUTTONS
+--
+
+
 getLogsButton : Element Msg
 getLogsButton =
     Input.button Style.button
         { onPress = Just GetLogs
         , label = el [ Font.size 14 ] (text "Get logs")
-        }
-
-
-getEventsButton : Element Msg
-getEventsButton =
-    Input.button Style.button
-        { onPress = Just (GetEvents 1)
-        , label = Element.text "Get events"
         }
 
 
@@ -368,6 +346,12 @@ submitEventButton =
         { onPress = Just MakeEvent
         , label = Element.text "Submit"
         }
+
+
+
+--
+-- INPUT FIELDS
+--
 
 
 inputValue model =
@@ -410,39 +394,20 @@ getLogs userId =
         |> Graphql.Http.send GotLogs
 
 
+logMutation :
+    Int
+    -> String
+    -> LogTypeValue
+    -> SelectionSet decodesTo Logger.Object.Log
+    -> SelectionSet (Maybe decodesTo) Graphql.Operation.RootMutation
+logMutation userId name logType =
+    Mutation.createLog { userId = userId, logType = logType, name = name }
 
--- (Logger.Object.Log.logType |> SelectionSet.map fixOptions)
--- Logger.Object.Log.events
 
-
-fixOptions =
-    \optionals -> { optionals | logType = Present LogTypeValue.Float }
-
-
-
---
---type alias Log =
---    { id : Int
---    , name : String
---    , userId : Int
---    , logType : LogTypeValue
---    , events : List Event
---    }
---
---logTypeValueOfString : String -> Maybe LogTypeValue
---logTypeValueOfString str =
---    case str of
---        "INTEGER" ->
---            Just LogTypeValue.Integer
---
---        "FLOAT" ->
---            Just LogTypeValue.Float
---
---        "DATETIME" ->
---            Just LogTypeValue.Datetime
---
---        _ ->
---            Nothing
+makeLog userId name logType =
+    logMutation userId name logType logSelection
+        |> Graphql.Http.mutationRequest (Configuration.backend ++ "/graphiql")
+        |> Graphql.Http.send LogCreated
 
 
 eventQuery : Int -> SelectionSet (List Event) RootQuery
@@ -457,11 +422,6 @@ fpEventMutation :
     -> SelectionSet (Maybe decodesTo) Graphql.Operation.RootMutation
 fpEventMutation logId value =
     Mutation.createEvent { logId = logId, value = value }
-
-
-
--- SelectionSet decodesTo Graphql.Operation.RootMutation
--- makeEvent : Int -> Float -> Cmd Msg
 
 
 makeEvent logId value =
@@ -500,7 +460,7 @@ query1 =
 
 
 --
--- Chart
+-- CHART
 --
 
 
