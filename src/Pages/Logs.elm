@@ -164,7 +164,7 @@ view sharedState model =
         , row [ spacing 100, alignBottom ]
             [ row [ spacing 12 ]
                 [ getLogsButton
-                , el [ Font.size 12 ] (text "Filters")
+                , el [ Font.size 14, Font.bold ] (text "Grouping")
                 , noFilterButton model
                 , filterByDayButton model
                 ]

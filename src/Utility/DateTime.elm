@@ -3,11 +3,13 @@ module Utility.DateTime exposing
     , daysBetweenNaiveDates
     , isoStringFromNaiveDateTime
     , offsetDateTimeStringByHours
+    , posixFromNaiveDateString
     , rataDieFromNaiveDateTime
     )
 
 import Date exposing (Date, Unit(..), diff)
 import Parser exposing (..)
+import Time
 
 
 type alias DT =
@@ -18,6 +20,17 @@ type alias DT =
     , minute : Int
     , second : Int
     }
+
+
+type alias TR =
+    { hour : Int
+    , minute : Int
+    , second : Int
+    }
+
+
+epoch =
+    719163
 
 
 parseDT : Parser DT
@@ -32,6 +45,18 @@ parseDT =
         |= (parseUntil 'T' |> Parser.map strToInt)
         |. symbol "T"
         |. chompWhile (\c -> c == '0')
+        |= (parseUntil ':' |> Parser.map strToInt)
+        |. symbol ":"
+        |. chompWhile (\c -> c == '0')
+        |= (parseUntil ':' |> Parser.map strToInt)
+        |. symbol ":"
+        |. chompWhile (\c -> c == '0')
+        |= (parseUntil '.' |> Parser.map strToInt)
+
+
+parseTR : Parser TR
+parseTR =
+    succeed TR
         |= (parseUntil ':' |> Parser.map strToInt)
         |. symbol ":"
         |. chompWhile (\c -> c == '0')
@@ -57,19 +82,51 @@ offsetDateTimeByHours h dt =
         { dt | hour = newHours }
 
     else
-        { dt | day = dt.day - 1, hour = newHours + 24 }
+        { dt | day = max 1 (dt.day - 1), hour = newHours + 24 }
+
+
+offsetTRByHours : Int -> TR -> TR
+offsetTRByHours h tt =
+    let
+        newHours =
+            tt.hour + h
+    in
+    if newHours >= 24 then
+        { tt | hour = newHours - 24 }
+
+    else if newHours > 0 then
+        { tt | hour = newHours }
+
+    else
+        { tt | hour = newHours + 24 }
 
 
 offsetDateTimeStringByHours : Int -> String -> String
 offsetDateTimeStringByHours k str =
-    case Parser.run parseDT str of
-        Ok dt ->
-            dt
-                |> offsetDateTimeByHours k
-                |> stringValueOfDT
+    let
+        tts =
+            case String.split "T" str of
+                [ _, tts_ ] ->
+                    tts_
 
-        Err _ ->
-            "This should not happen"
+                _ ->
+                    ""
+
+        posix_ =
+            posixfromNaiveDateTimeString str
+
+        shiftedDateString =
+            Date.fromPosix Time.utc (Time.millisToPosix ((posix_ + k * 3600) * 1000)) |> Date.toIsoString
+
+        shiftedTimeString =
+            case run parseTR tts of
+                Ok tr ->
+                    offsetTRByHours k tr |> stringValueOfTR
+
+                Err _ ->
+                    "00:00:00"
+    in
+    shiftedDateString ++ "T" ++ shiftedTimeString
 
 
 stringValueOfDT : DT -> String
@@ -100,6 +157,21 @@ stringValueOfDT dt =
             String.join ":" [ h, min, s ]
     in
     datePart ++ "T" ++ timePart
+
+
+stringValueOfTR : TR -> String
+stringValueOfTR tr =
+    let
+        h =
+            String.padLeft 2 '0' <| String.fromInt tr.hour
+
+        min =
+            String.padLeft 2 '0' <| String.fromInt tr.minute
+
+        s =
+            String.padLeft 2 '0' <| String.fromInt tr.second
+    in
+    String.join ":" [ h, min, s ]
 
 
 strToInt : String -> Int
@@ -160,3 +232,40 @@ daysBetweenNaiveDates dateString1 dateString2 =
 
         ( _, _ ) ->
             Nothing
+
+
+posixFromNaiveDateString str =
+    case dateFromNaiveDateTime str of
+        Err _ ->
+            0
+
+        Ok result ->
+            (Date.toRataDie result - 719163) * 86400
+
+
+posixFromTimeString str =
+    case run parseTR str of
+        Err _ ->
+            0
+
+        Ok result ->
+            let
+                h =
+                    result.hour * 3600
+
+                m =
+                    result.minute * 60
+
+                s =
+                    result.second
+            in
+            h + m + s
+
+
+posixfromNaiveDateTimeString str =
+    case String.split "T" str of
+        [ dd, tt ] ->
+            posixFromNaiveDateString dd + posixFromTimeString tt
+
+        _ ->
+            0
