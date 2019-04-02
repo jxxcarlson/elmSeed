@@ -139,7 +139,12 @@ update sharedState sharedStateUpdate =
             { sharedState | currentEventList = Just eventList }
 
         UpdateCurrentLog maybeLog ->
-            { sharedState | currentLog = maybeLog }
+            case maybeLog of
+                Nothing ->
+                    { sharedState | currentLog = maybeLog, currentEventList = Nothing }
+
+                Just log ->
+                    { sharedState | currentLog = maybeLog }
 
         NoUpdate ->
             sharedState

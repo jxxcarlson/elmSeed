@@ -56,6 +56,7 @@ type alias Model =
     , valueString : String
     , filterState : FilterState
     , logName : String
+    , logFilterString : String
     , timerState : TimerState
     , yScaleFactor : String
     }
@@ -67,15 +68,10 @@ initModel =
     , valueString = ""
     , filterState = NoFilter
     , logName = ""
+    , logFilterString = ""
     , timerState = TSInitial
     , yScaleFactor = "60.0"
     }
-
-
-
---
--- MSG
---
 
 
 type TimerState
@@ -97,6 +93,12 @@ type FilterState
     | FilterByDay
 
 
+
+--
+-- MSG
+--
+
+
 type Msg
     = NoOp
     | CreateLog
@@ -112,6 +114,12 @@ type Msg
     | GotLogName String
     | TC TimerCommand
     | GotYScaleFactor String
+    | GotLogFilter String
+
+
+
+--    | FilterLogs
+--    | UnFilterLogs
 
 
 update : SharedState -> Msg -> Model -> ( Model, Cmd Msg, SharedStateUpdate )
@@ -166,6 +174,9 @@ update sharedState msg model =
 
         GotLogs (Err _) ->
             ( { model | message = "Error getting logs" }, Cmd.none, NoUpdate )
+
+        GotLogFilter str ->
+            ( { model | logFilterString = str }, Cmd.none, UpdateCurrentLog Nothing )
 
         GetEvents logId ->
             let
@@ -242,7 +253,8 @@ update sharedState msg model =
 view : SharedState -> Model -> Element Msg
 view sharedState model =
     column (Style.mainColumn fill fill ++ [ spacing 12, padding 40, Background.color (Style.makeGrey 0.9) ])
-        [ row [ spacing 12 ]
+        [ row [ spacing 8 ] [ el [ Font.bold ] (text "Filter:"), inputLogNameFilter model ]
+        , row [ spacing 12 ]
             [ logListPanel sharedState model
             , eventsPanel sharedState model
             , chart sharedState model
@@ -323,7 +335,7 @@ secondsFromPosix p =
 
 logListPanel : SharedState -> Model -> Element Msg
 logListPanel sharedState model =
-    column [ spacing 20, height (px 490), width (px 200), Border.width 1 ]
+    column [ spacing 20, height (px 450), width (px 200), Border.width 1 ]
         [ viewLogs sharedState model
         ]
 
@@ -336,12 +348,12 @@ viewLogs sharedState model =
                 [ el [ Font.bold ] (text "No logs available")
                 ]
 
-        Just events ->
+        Just logs ->
             column [ spacing 12, padding 20, height (px 400) ]
                 [ el [ Font.size 16, Font.bold ] (text "Logs")
                 , indexedTable
                     [ spacing 4, Font.size 12 ]
-                    { data = events
+                    { data = filterLogs model.logFilterString logs
                     , columns =
                         [ { header = el [ Font.bold ] (text "k")
                           , width = px 40
@@ -354,6 +366,28 @@ viewLogs sharedState model =
                         ]
                     }
                 ]
+
+
+filterLogs : String -> List Log -> List Log
+filterLogs filter logs =
+    List.filter (\log -> String.contains (String.toLower filter) (String.toLower log.name)) logs
+
+
+
+--filterLogsButton : Element Msg
+--filterLogsButton =
+--    Input.button Style.button
+--        { onPress = Just FilterLogs
+--        , label = Element.text "Filter"
+--        }
+--
+--
+--unFilterLogsButton : Element Msg
+--unFilterLogsButton =
+--    Input.button Style.button
+--        { onPress = Just UnFilterLogs
+--        , label = Element.text "Show all"
+--        }
 
 
 logNameButton : Maybe Log -> Log -> Element Msg
@@ -382,7 +416,7 @@ filterByDayButton model =
 
 eventsPanel : SharedState -> Model -> Element Msg
 eventsPanel sharedState model =
-    column [ spacing 20, height (px 490), width (px 350), Border.width 1 ]
+    column [ spacing 20, height (px 450), width (px 350), Border.width 1 ]
         [ viewEvents sharedState model
         ]
 
@@ -408,7 +442,7 @@ viewEvents sharedState model =
                         FilterByDay ->
                             Data.eventsByDay -5 events_
             in
-            column [ spacing 12, padding 20, height (px 480) ]
+            column [ spacing 12, padding 20, height (px 440) ]
                 [ el [ Font.size 16, Font.bold ] (text "Events")
                 , indexedTable [ spacing 4, Font.size 12 ]
                     { data = events
@@ -572,6 +606,15 @@ inputValue model =
     Input.text inputStyle
         { onChange = GotValueString
         , text = model.valueString
+        , placeholder = Nothing
+        , label = Input.labelLeft [ Font.size 14, moveDown 8 ] (text "")
+        }
+
+
+inputLogNameFilter model =
+    Input.text inputStyle
+        { onChange = GotLogFilter
+        , text = model.logFilterString
         , placeholder = Nothing
         , label = Input.labelLeft [ Font.size 14, moveDown 8 ] (text "")
         }
