@@ -29,7 +29,7 @@ subscriptions model =
         [ OutsideInfo.getInfoFromOutside Outside LogErr
         , case Configuration.site == "LOCAL" of
             True ->
-                Time.every 100000 TimeChange
+                Time.every 1000 TimeChange
 
             False ->
                 Time.every 1000 TimeChange

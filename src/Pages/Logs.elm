@@ -9,6 +9,7 @@ module Pages.Logs exposing
 
 --
 
+import Common.BarGraph as BarGraph
 import Common.Style as Style
 import Common.Utility as Utility
 import Configuration
@@ -45,6 +46,7 @@ import Logger.Object.Log
 import Logger.Query as Query
 import Logger.Scalar exposing (NaiveDateTime(..))
 import SharedState exposing (Event, Log, SharedState, SharedStateUpdate(..))
+import Time exposing (Posix)
 import Utility.Data as Data
 import Utility.DateTime exposing (offsetDateTimeStringByHours, rataDieFromNaiveDateTime)
 
@@ -53,6 +55,9 @@ type alias Model =
     { message : String
     , valueString : String
     , filterState : FilterState
+    , logName : String
+    , timerState : TimerState
+    , yScaleFactor : String
     }
 
 
@@ -61,6 +66,9 @@ initModel =
     { message = "Nothing yet."
     , valueString = ""
     , filterState = NoFilter
+    , logName = ""
+    , timerState = TSInitial
+    , yScaleFactor = "1.0"
     }
 
 
@@ -70,6 +78,20 @@ initModel =
 --
 
 
+type TimerState
+    = TSInitial
+    | TSRunning
+    | TSPaused
+
+
+type TimerCommand
+    = TCStart
+    | TCPause
+    | TCContinue
+    | TCLog
+    | TCReset
+
+
 type FilterState
     = NoFilter
     | FilterByDay
@@ -77,6 +99,7 @@ type FilterState
 
 type Msg
     = NoOp
+    | CreateLog
     | GetLogs
     | GotLogs (Result (Graphql.Http.Error LogListResponse) LogListResponse)
     | LogCreated (Result (Graphql.Http.Error (Maybe Log)) (Maybe Log))
@@ -86,6 +109,9 @@ type Msg
     | MakeEvent
     | GotValueString String
     | SetFilter FilterState
+    | GotLogName String
+    | TC TimerCommand
+    | GotYScaleFactor String
 
 
 update : SharedState -> Msg -> Model -> ( Model, Cmd Msg, SharedStateUpdate )
@@ -94,8 +120,35 @@ update sharedState msg model =
         NoOp ->
             ( model, Cmd.none, NoUpdate )
 
-        LogCreated (Ok log) ->
-            ( model, Cmd.none, NoUpdate )
+        GotLogName str ->
+            ( { model | logName = str }, Cmd.none, NoUpdate )
+
+        GotYScaleFactor str ->
+            ( { model | yScaleFactor = str }, Cmd.none, NoUpdate )
+
+        CreateLog ->
+            case sharedState.currentUser of
+                Nothing ->
+                    ( model, Cmd.none, NoUpdate )
+
+                Just user ->
+                    ( model, makeLog user.id model.logName LogTypeValue.Float, NoUpdate )
+
+        LogCreated (Ok result) ->
+            let
+                updatedLogList : List Log
+                updatedLogList =
+                    case ( sharedState.currentLogList, result ) of
+                        ( Nothing, Just log ) ->
+                            [ log ]
+
+                        ( Just logList, Just log ) ->
+                            logList ++ [ log ]
+
+                        ( _, _ ) ->
+                            []
+            in
+            ( model, Cmd.none, SharedState.UpdateSharedLogList updatedLogList )
 
         LogCreated (Err _) ->
             ( model, Cmd.none, NoUpdate )
@@ -159,6 +212,32 @@ update sharedState msg model =
         SetFilter filterState ->
             ( { model | filterState = filterState }, Cmd.none, NoUpdate )
 
+        TC timerCommand ->
+            case timerCommand of
+                TCStart ->
+                    ( { model | timerState = TSRunning }, Cmd.none, BeginTimer )
+
+                TCPause ->
+                    ( { model | timerState = TSPaused }, Cmd.none, PauseTimer )
+
+                TCContinue ->
+                    ( { model | timerState = TSRunning }, Cmd.none, ContinueTimer )
+
+                TCLog ->
+                    let
+                        cmd =
+                            case sharedState.currentLog of
+                                Nothing ->
+                                    Cmd.none
+
+                                Just log ->
+                                    makeEvent log.id (String.fromFloat (Utility.roundTo 6 <| (sharedState.accumulatedTime + sharedState.elapsedTime) / 60.0))
+                    in
+                    ( { model | timerState = TSInitial }, cmd, ResetTimer )
+
+                TCReset ->
+                    ( { model | timerState = TSInitial }, Cmd.none, ResetTimer )
+
 
 view : SharedState -> Model -> Element Msg
 view sharedState model =
@@ -168,16 +247,78 @@ view sharedState model =
             , eventsPanel sharedState model
             , chart sharedState model
             ]
-        , row [ spacing 100, alignBottom ]
-            [ row [ spacing 12 ]
-                [ getLogsButton
-                , el [ Font.size 14, Font.bold ] (text "Grouping")
-                , noFilterButton model
-                , filterByDayButton model
+        , column [ padding 8, Border.width 1, width (px 562), spacing 12 ]
+            [ row [ spacing 140, alignBottom ]
+                [ row [ spacing 12, Font.size 14 ]
+                    [ getLogsButton
+                    ]
+                , row [ spacing 24, Font.size 14 ]
+                    [ row [ spacing 8 ] [ submitEventButton, inputValue model ]
+                    , row [ spacing 8 ] [ el [ Font.bold ] (text "Group:"), noFilterButton model, filterByDayButton model ]
+                    ]
                 ]
-            , row [ spacing 12 ] [ inputValue model, submitEventButton ]
+            , timerPanel sharedState model
+            , newLogPanel model
             ]
         ]
+
+
+{-| xxx
+-}
+timerPanel : SharedState -> Model -> Element Msg
+timerPanel sharedState model =
+    row [ spacing 12, Font.size 12, padding 8, Border.width 1, width (px 450) ]
+        [ el [ Font.bold ] (text "TIMER")
+        , startTimerButton
+        , pauseTimerButton model
+        , resetTimerButton
+        , logTimerButton
+        , row [ spacing 8 ]
+            [ el [ Font.bold ] (text "Elapsed time")
+            , el [ Font.size 16, Font.bold, padding 8, Font.color Style.red, Background.color Style.black ]
+                (text <| timeStringFromFloat <| (sharedState.accumulatedTime + sharedState.elapsedTime) / scaleFactor)
+            ]
+        ]
+
+
+scaleFactor =
+    1
+
+
+timeStringFromFloat : Float -> String
+timeStringFromFloat t_ =
+    let
+        t =
+            round t_
+
+        s =
+            modBy 60 t
+
+        m =
+            (t - s) // 60
+
+        h =
+            m // 60
+
+        ss =
+            String.pad 2 '0' (String.fromInt s)
+
+        ms =
+            String.pad 2 '0' (String.fromInt <| modBy 60 m)
+
+        hs =
+            String.pad 2 '0' (String.fromInt <| h)
+    in
+    hs ++ ":" ++ ms ++ ":" ++ ss
+
+
+secondsFromPosix : Posix -> Int
+secondsFromPosix p =
+    p
+        |> Time.posixToMillis
+        |> toFloat
+        |> (\x -> x / 1000.0)
+        |> round
 
 
 logListPanel : SharedState -> Model -> Element Msg
@@ -225,7 +366,7 @@ logNameButton currentLog log =
 
 noFilterButton : Model -> Element Msg
 noFilterButton model =
-    Input.button (Style.activeButton (model.filterState == NoFilter))
+    Input.button (Style.titleButton (model.filterState == NoFilter))
         { onPress = Just (SetFilter NoFilter)
         , label = Element.text "None"
         }
@@ -233,7 +374,7 @@ noFilterButton model =
 
 filterByDayButton : Model -> Element Msg
 filterByDayButton model =
-    Input.button (Style.activeButton (model.filterState == FilterByDay))
+    Input.button (Style.titleButton (model.filterState == FilterByDay))
         { onPress = Just (SetFilter FilterByDay)
         , label = Element.text "By day"
         }
@@ -290,15 +431,31 @@ viewEvents sharedState model =
                           }
                         , { header = el [ Font.bold ] (text "Value")
                           , width = px 40
-                          , view = \k event -> el [ Font.size 12 ] (text <| event.value)
+                          , view = \k event -> el [ Font.size 12 ] (text <| formatValue model.yScaleFactor 2 <| event.value)
                           }
                         ]
                     }
                 , row [ spacing 12, alignBottom ]
-                    [ el [ Font.size 12 ] (text <| "Minutes: " ++ String.fromFloat eventSum_)
+                    [ el [ Font.size 12 ] (text <| "Minutes: " ++ String.fromFloat (Utility.roundTo 1 eventSum_))
                     , el [ Font.size 12 ] (text <| "Hours: " ++ String.fromFloat (Utility.roundTo 1 (eventSum_ / 60)))
                     ]
                 ]
+
+
+formatValue : String -> Int -> String -> String
+formatValue scaleFactor_ k yString =
+    case String.toFloat yString of
+        Nothing ->
+            yString
+
+        Just y ->
+            case String.toFloat scaleFactor_ of
+                Nothing ->
+                    yString
+
+                Just f_ ->
+                    Utility.roundTo k (y / f_)
+                        |> String.fromFloat
 
 
 eventSum : List Event -> Float
@@ -328,8 +485,50 @@ timeStringOfDateTimeString str =
 
 
 --
--- BUTTONS
+-- BUTTON
 --
+
+
+{-| xxx
+-}
+startTimerButton : Element Msg
+startTimerButton =
+    Input.button Style.smallButton
+        { onPress = Just (TC TCStart)
+        , label = el [ Font.size 12 ] (text "Start")
+        }
+
+
+pauseTimerButton : Model -> Element Msg
+pauseTimerButton model =
+    case model.timerState of
+        TSPaused ->
+            Input.button Style.smallButton
+                { onPress = Just (TC TCContinue)
+                , label = el [ Font.size 12 ] (text "Cont")
+                }
+
+        _ ->
+            Input.button Style.smallButton
+                { onPress = Just (TC TCPause)
+                , label = el [ Font.size 12 ] (text "Pause")
+                }
+
+
+resetTimerButton : Element Msg
+resetTimerButton =
+    Input.button Style.smallButton
+        { onPress = Just (TC TCReset)
+        , label = el [ Font.size 12 ] (text "Reset")
+        }
+
+
+logTimerButton : Element Msg
+logTimerButton =
+    Input.button Style.smallButton
+        { onPress = Just (TC TCLog)
+        , label = el [ Font.size 12 ] (text "Log")
+        }
 
 
 getLogsButton : Element Msg
@@ -348,6 +547,21 @@ submitEventButton =
         }
 
 
+createLButton : Model -> Element Msg
+createLButton model =
+    Input.button Style.button
+        { onPress = Just CreateLog
+        , label = el [ Font.size 14 ] (text "Create log with name")
+        }
+
+
+newLogPanel model =
+    row [ spacing 12, Font.size 12 ]
+        [ createLButton model
+        , inputLogName model
+        ]
+
+
 
 --
 -- INPUT FIELDS
@@ -359,12 +573,36 @@ inputValue model =
         { onChange = GotValueString
         , text = model.valueString
         , placeholder = Nothing
-        , label = Input.labelLeft [ Font.size 14, moveDown 8 ] (text "Value")
+        , label = Input.labelLeft [ Font.size 14, moveDown 8 ] (text "")
+        }
+
+
+inputLogName model =
+    Input.text (inputStyle ++ [ width (px 200) ])
+        { onChange = GotLogName
+        , text = model.logName
+        , placeholder = Nothing
+        , label = Input.labelLeft [ Font.size 14, moveDown 8 ] (text "")
+        }
+
+
+inputYScaleFactor model =
+    Input.text (inputStyle ++ [ width (px 60) ])
+        { onChange = GotYScaleFactor
+        , text = model.yScaleFactor
+        , placeholder = Nothing
+        , label = Input.labelLeft [ Font.size 14, moveDown 8 ] (text "")
         }
 
 
 inputStyle =
-    [ width (px 60), height (px 30), Background.color (Style.makeGrey 0.4), Font.color Style.white, Font.size 12 ]
+    [ width (px 60)
+    , height (px 30)
+    , Background.color (Style.makeGrey 0.8)
+    , Font.color Style.black
+    , Font.size 12
+    , Border.width 2
+    ]
 
 
 
@@ -464,8 +702,8 @@ query1 =
 --
 
 
-chart : SharedState -> Model -> Element msg
-chart sharedState model =
+chart1 : SharedState -> Model -> Element msg
+chart1 sharedState model =
     case sharedState.currentEventList of
         Nothing ->
             Element.none
@@ -487,12 +725,64 @@ chart sharedState model =
                 ]
 
 
+chart : SharedState -> Model -> Element Msg
+chart sharedState model =
+    case sharedState.currentEventList of
+        Nothing ->
+            Element.none
+
+        Just eventList_ ->
+            let
+                events =
+                    case model.filterState of
+                        NoFilter ->
+                            Data.correctTimeZone -5 eventList_
+
+                        FilterByDay ->
+                            Data.eventsByDay -5 eventList_
+            in
+            column [ Font.size 12, spacing 36, moveRight 40, width (px 450) ]
+                [ row [] [ BarGraph.asHtml gA (prepareData2 (getScaleFactor model) events) |> Element.html ]
+                , row [ spacing 8 ]
+                    [ el [] (text "Scale factor")
+                    , inputYScaleFactor model
+                    ]
+                ]
+
+
+getScaleFactor : Model -> Float
+getScaleFactor model =
+    case String.toFloat model.yScaleFactor of
+        Nothing ->
+            1.0
+
+        Just f ->
+            f
+
+
+gA =
+    { dx = 10
+    , color = "blue"
+    , barHeight = 200
+    , graphWidth = 400
+    }
+
+
 prepareData : List Event -> List Data
 prepareData eventList =
     eventList
         |> List.map .value
         |> List.indexedMap Tuple.pair
         |> List.map dataFromPair
+
+
+prepareData2 : Float -> List Event -> List Float
+prepareData2 scaleFactor_ eventList =
+    eventList
+        |> List.map .value
+        |> List.map String.toFloat
+        |> List.map (Maybe.withDefault -999.0)
+        |> List.map (\x -> x / scaleFactor_)
 
 
 dataFromPair : ( Int, String ) -> Data
