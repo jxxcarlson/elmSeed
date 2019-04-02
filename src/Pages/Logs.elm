@@ -68,7 +68,7 @@ initModel =
     , filterState = NoFilter
     , logName = ""
     , timerState = TSInitial
-    , yScaleFactor = "1.0"
+    , yScaleFactor = "60.0"
     }
 
 
