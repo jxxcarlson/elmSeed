@@ -57,6 +57,7 @@ type alias Model =
     , filterState : FilterState
     , logName : String
     , logFilterString : String
+    , timeZoneOffset : Int
     , timerState : TimerState
     , yScaleFactor : String
     }
@@ -69,6 +70,7 @@ initModel =
     , filterState = NoFilter
     , logName = ""
     , logFilterString = ""
+    , timeZoneOffset = -4
     , timerState = TSInitial
     , yScaleFactor = "60.0"
     }
@@ -437,10 +439,10 @@ viewEvents sharedState model =
                 events =
                     case model.filterState of
                         NoFilter ->
-                            Data.correctTimeZone -5 events_
+                            Data.correctTimeZone model.timeZoneOffset events_
 
                         FilterByDay ->
-                            Data.eventsByDay -5 events_
+                            Data.eventsByDay model.timeZoneOffset events_
             in
             column [ spacing 12, padding 20, height (px 440) ]
                 [ el [ Font.size 16, Font.bold ] (text "Events")
@@ -756,10 +758,10 @@ chart1 sharedState model =
                 events =
                     case model.filterState of
                         NoFilter ->
-                            Data.correctTimeZone -5 eventList_
+                            Data.correctTimeZone model.timeZoneOffset eventList_
 
                         FilterByDay ->
-                            Data.eventsByDay -5 eventList_
+                            Data.eventsByDay model.timeZoneOffset eventList_
             in
             column [ Font.size 12 ]
                 [ LineChart.viewCustom chartConfig
@@ -779,10 +781,10 @@ chart sharedState model =
                 events =
                     case model.filterState of
                         NoFilter ->
-                            Data.correctTimeZone -5 eventList_
+                            Data.correctTimeZone model.timeZoneOffset eventList_
 
                         FilterByDay ->
-                            Data.eventsByDay -5 eventList_
+                            Data.eventsByDay model.timeZoneOffset eventList_
             in
             column [ Font.size 12, spacing 36, moveRight 40, width (px 450) ]
                 [ row [] [ BarGraph.asHtml gA (prepareData2 (getScaleFactor model) events) |> Element.html ]

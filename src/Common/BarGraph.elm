@@ -1,10 +1,11 @@
-module Common.BarGraph exposing (GraphAttributes, asHtml, asSVG, barRect, prepare, svgOfData, testData, xCoordinates)
+module Common.BarGraph exposing (GraphAttributes, asHtml, asSVG, barRect, prepare, svgOfData, testData)
 
 {- exposing (GraphAttributes, asHtml, asSVG) -}
 
+import Common.Utility as Utility
 import Element exposing (..)
 import Html exposing (Html)
-import Svg exposing (Svg, g, line, rect, svg)
+import Svg exposing (Svg, g, line, rect, svg, text, text_)
 import Svg.Attributes as SA
 
 
@@ -21,7 +22,7 @@ asHtml ga data =
     svg
         [ SA.transform "scale(1,-1)"
         , SA.height <| String.fromFloat ga.barHeight
-        , SA.viewBox <| "0 0 " ++ String.fromFloat ga.graphWidth ++ " " ++ String.fromFloat ga.barHeight
+        , SA.viewBox <| "-60 -10 " ++ String.fromFloat ga.graphWidth ++ " " ++ String.fromFloat (ga.barHeight + 20)
         ]
         [ asSVG ga data ]
 
@@ -31,8 +32,19 @@ asSVG gA data =
     let
         offset =
             String.fromFloat axesOffset
+
+        yMax =
+            List.maximum data |> Maybe.withDefault 0
+
+        yMaxAsString =
+            String.fromFloat (yMax |> Utility.roundTo 2)
+
+        yMaxHalfAsString =
+            String.fromFloat (yMax / 2 |> Utility.roundTo 2)
     in
-    g [ SA.transform <| "translate(" ++ offset ++ "," ++ offset ++ ")" ] <| svgOfData gA data ++ [ abscissa gA, ordinate gA ]
+    g [ SA.transform <| "translate(" ++ offset ++ "," ++ offset ++ ")" ] <|
+        svgOfData gA data
+            ++ [ abscissa gA, ordinate gA, yTickMark gA 0.0 "0  ", yTickMark gA 0.5 yMaxHalfAsString, yTickMark gA 1.0 yMaxAsString ]
 
 
 svgOfData : GraphAttributes -> List Float -> List (Svg msg)
@@ -119,6 +131,26 @@ ordinate gA =
             String.fromFloat -axesOffset
     in
     line [ SA.x1 offset, SA.y1 offset, SA.y2 <| String.fromFloat gA.barHeight, SA.x2 offset, SA.stroke "rgb(80,80,80)", SA.strokeWidth "2" ] []
+
+
+yTickMark : GraphAttributes -> Float -> String -> Svg msg
+yTickMark gA height label =
+    let
+        dy =
+            String.fromFloat <| gA.barHeight * height - 3
+    in
+    g []
+        [ line
+            [ SA.x1 <| String.fromFloat -axesOffset
+            , SA.y1 <| String.fromFloat <| height * gA.barHeight
+            , SA.x2 <| String.fromFloat (-axesOffset - 10)
+            , SA.y2 <| String.fromFloat <| height * gA.barHeight
+            , SA.stroke "rgb(80,80,80)"
+            , SA.strokeWidth "1"
+            ]
+            []
+        , text_ [ SA.transform <| "translate(0," ++ dy ++ ") scale(1,-1)", SA.x <| String.fromFloat -40, SA.y <| "0" ] [ text label ]
+        ]
 
 
 
