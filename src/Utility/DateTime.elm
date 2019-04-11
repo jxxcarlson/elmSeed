@@ -1,7 +1,9 @@
 module Utility.DateTime exposing
     ( dateFromNaiveDateTime
+    , dateFromNaiveDateTime2
     , daysBetweenNaiveDates
     , isoStringFromNaiveDateTime
+    , naiveDateStringFromPosix
     , offsetDateTimeStringByHours
     , posixFromNaiveDateString
     , rataDieFromNaiveDateTime
@@ -9,7 +11,7 @@ module Utility.DateTime exposing
 
 import Date exposing (Date, Unit(..), diff)
 import Parser exposing (..)
-import Time
+import Time exposing (Posix)
 
 
 type alias TR =
@@ -118,6 +120,15 @@ dateFromNaiveDateTime str =
         |> Result.andThen Date.fromIsoString
 
 
+dateFromNaiveDateTime2 : String -> Maybe Date
+dateFromNaiveDateTime2 str =
+    str
+        |> isoStringFromNaiveDateTime
+        |> Result.fromMaybe "error parsing date string"
+        |> Result.andThen Date.fromIsoString
+        |> Result.toMaybe
+
+
 rataDieFromNaiveDateTime : String -> Int
 rataDieFromNaiveDateTime dateString =
     case dateFromNaiveDateTime dateString of
@@ -126,6 +137,15 @@ rataDieFromNaiveDateTime dateString =
 
         Err _ ->
             0
+
+
+inLastNDaysBeforeDate : String -> Int -> String -> Maybe Bool
+inLastNDaysBeforeDate endDate interval runningDate =
+    let
+        predicate =
+            \x -> x <= interval
+    in
+    Maybe.map predicate (daysBetweenNaiveDates runningDate endDate)
 
 
 daysBetweenNaiveDates : String -> String -> Maybe Int
@@ -143,6 +163,61 @@ daysBetweenNaiveDates dateString1 dateString2 =
 
         ( _, _ ) ->
             Nothing
+
+
+naiveDateStringFromPosix : Posix -> String
+naiveDateStringFromPosix posix =
+    let
+        y =
+            Time.toYear Time.utc posix |> String.fromInt
+
+        m =
+            Time.toMonth Time.utc posix |> monthToString
+
+        d =
+            Time.toDay Time.utc posix |> String.fromInt |> String.padLeft 2 '0'
+    in
+    y ++ "-" ++ m ++ "-" ++ d
+
+
+monthToString : Time.Month -> String
+monthToString m =
+    case m of
+        Time.Jan ->
+            "01"
+
+        Time.Feb ->
+            "02"
+
+        Time.Mar ->
+            "03"
+
+        Time.Apr ->
+            "04"
+
+        Time.May ->
+            "05"
+
+        Time.Jun ->
+            "06"
+
+        Time.Jul ->
+            "07"
+
+        Time.Aug ->
+            "08"
+
+        Time.Sep ->
+            "09"
+
+        Time.Oct ->
+            "10"
+
+        Time.Nov ->
+            "11"
+
+        Time.Dec ->
+            "12"
 
 
 posixFromNaiveDateString str =
