@@ -54,9 +54,10 @@ import Utility.DateTime exposing (offsetDateTimeStringByHours, rataDieFromNaiveD
 type alias Model =
     { message : String
     , valueString : String
-    , filterState : FilterState
+    , filterState : EventGrouping
     , logName : String
     , logFilterString : String
+    , eventDateFilterString : String
     , timeZoneOffset : Int
     , timerState : TimerState
     , yScaleFactor : String
@@ -67,9 +68,10 @@ initModel : Model
 initModel =
     { message = "Nothing yet."
     , valueString = ""
-    , filterState = NoFilter
+    , filterState = NoGrouping
     , logName = ""
     , logFilterString = ""
+    , eventDateFilterString = ""
     , timeZoneOffset = -4
     , timerState = TSInitial
     , yScaleFactor = "60.0"
@@ -90,9 +92,9 @@ type TimerCommand
     | TCReset
 
 
-type FilterState
-    = NoFilter
-    | FilterByDay
+type EventGrouping
+    = NoGrouping
+    | GroupByDay
 
 
 
@@ -112,11 +114,12 @@ type Msg
     | EventCreated (Result (Graphql.Http.Error (Maybe Event)) (Maybe Event))
     | MakeEvent
     | GotValueString String
-    | SetFilter FilterState
+    | SetGroupFilter EventGrouping
     | GotLogName String
     | TC TimerCommand
     | GotYScaleFactor String
     | GotLogFilter String
+    | GotEventDateFilter String
 
 
 
@@ -180,6 +183,9 @@ update sharedState msg model =
         GotLogFilter str ->
             ( { model | logFilterString = str }, Cmd.none, UpdateCurrentLog Nothing )
 
+        GotEventDateFilter str ->
+            ( { model | eventDateFilterString = str }, Cmd.none, NoUpdate )
+
         GetEvents logId ->
             let
                 maybeLog =
@@ -222,7 +228,7 @@ update sharedState msg model =
                     , NoUpdate
                     )
 
-        SetFilter filterState ->
+        SetGroupFilter filterState ->
             ( { model | filterState = filterState }, Cmd.none, NoUpdate )
 
         TC timerCommand ->
@@ -255,7 +261,11 @@ update sharedState msg model =
 view : SharedState -> Model -> Element Msg
 view sharedState model =
     column (Style.mainColumn fill fill ++ [ spacing 12, padding 40, Background.color (Style.makeGrey 0.9) ])
-        [ row [ spacing 8 ] [ el [ Font.bold ] (text "Filter:"), inputLogNameFilter model ]
+        [ row [ spacing 8 ]
+            [ el [ Font.bold ] (text "Filter:")
+            , inputLogNameFilter model
+            , inputEventDateFilter model
+            ]
         , row [ spacing 12 ]
             [ logListPanel sharedState model
             , eventsPanel sharedState model
@@ -402,16 +412,16 @@ logNameButton currentLog log =
 
 noFilterButton : Model -> Element Msg
 noFilterButton model =
-    Input.button (Style.titleButton (model.filterState == NoFilter))
-        { onPress = Just (SetFilter NoFilter)
+    Input.button (Style.titleButton (model.filterState == NoGrouping))
+        { onPress = Just (SetGroupFilter NoGrouping)
         , label = Element.text "None"
         }
 
 
 filterByDayButton : Model -> Element Msg
 filterByDayButton model =
-    Input.button (Style.titleButton (model.filterState == FilterByDay))
-        { onPress = Just (SetFilter FilterByDay)
+    Input.button (Style.titleButton (model.filterState == GroupByDay))
+        { onPress = Just (SetGroupFilter GroupByDay)
         , label = Element.text "By day"
         }
 
@@ -421,6 +431,21 @@ eventsPanel sharedState model =
     column [ spacing 20, height (px 450), width (px 350), Border.width 1 ]
         [ viewEvents sharedState model
         ]
+
+
+
+{-
+
+   case model.eventDateFilterString of
+          Nothing ->
+
+      let
+          todayND =
+              Utility.DateTime.naiveDateStringFromPosix sharedState.currentTime |> Debug.log "TODAY"
+
+          inLastNDaysBeforeDate endDate interval
+      in
+-}
 
 
 viewEvents : SharedState -> Model -> Element Msg
@@ -438,13 +463,13 @@ viewEvents sharedState model =
 
                 events =
                     case model.filterState of
-                        NoFilter ->
+                        NoGrouping ->
                             Data.correctTimeZone model.timeZoneOffset events_
 
-                        FilterByDay ->
+                        GroupByDay ->
                             Data.eventsByDay model.timeZoneOffset events_
             in
-            column [ spacing 12, padding 20, height (px 440) ]
+            column [ spacing 12, padding 20, height (px 430), scrollbarY ]
                 [ el [ Font.size 16, Font.bold ] (text "Events")
                 , indexedTable [ spacing 4, Font.size 12 ]
                     { data = events
@@ -622,6 +647,15 @@ inputLogNameFilter model =
         }
 
 
+inputEventDateFilter model =
+    Input.text inputStyle
+        { onChange = GotEventDateFilter
+        , text = model.logFilterString
+        , placeholder = Nothing
+        , label = Input.labelLeft [ Font.size 14, moveDown 8 ] (text "")
+        }
+
+
 inputLogName model =
     Input.text (inputStyle ++ [ width (px 200) ])
         { onChange = GotLogName
@@ -674,6 +708,7 @@ getLogs userId =
     logQuery userId
         |> Graphql.Http.queryRequest (Configuration.backend ++ "/graphiql")
         -- |> Graphql.Http.withHeader "authorization" "Bearer <your github bearer token>"
+        -- |> Graphql.Http.withHeader "Access-Control-Allow-Origin" "http://localhost:4000"
         |> Graphql.Http.send GotLogs
 
 
@@ -757,10 +792,10 @@ chart1 sharedState model =
             let
                 events =
                     case model.filterState of
-                        NoFilter ->
+                        NoGrouping ->
                             Data.correctTimeZone model.timeZoneOffset eventList_
 
-                        FilterByDay ->
+                        GroupByDay ->
                             Data.eventsByDay model.timeZoneOffset eventList_
             in
             column [ Font.size 12 ]
@@ -780,10 +815,10 @@ chart sharedState model =
             let
                 events =
                     case model.filterState of
-                        NoFilter ->
+                        NoGrouping ->
                             Data.correctTimeZone model.timeZoneOffset eventList_
 
-                        FilterByDay ->
+                        GroupByDay ->
                             Data.eventsByDay model.timeZoneOffset eventList_
             in
             column [ Font.size 12, spacing 36, moveRight 40, width (px 450) ]
