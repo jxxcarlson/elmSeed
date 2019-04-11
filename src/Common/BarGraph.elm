@@ -1,4 +1,10 @@
-module Common.BarGraph exposing (GraphAttributes, asHtml, asSVG, barRect, prepare, svgOfData, testData)
+module Common.BarGraph exposing (GraphAttributes, asHtml, asSVG)
+
+{-| BarGraph displays a bar graph of data presented as a list of floats:
+
+@docs GraphAttributes, asHtml, asSVG
+
+-}
 
 {- exposing (GraphAttributes, asHtml, asSVG) -}
 
