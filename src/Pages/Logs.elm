@@ -55,6 +55,7 @@ type alias Model =
     { message : String
     , valueString : String
     , filterState : EventGrouping
+    , dateFilter : DateFilter
     , logName : String
     , logFilterString : String
     , eventDateFilterString : String
@@ -69,6 +70,7 @@ initModel =
     { message = "Nothing yet."
     , valueString = ""
     , filterState = NoGrouping
+    , dateFilter = NoDateFilter
     , logName = ""
     , logFilterString = ""
     , eventDateFilterString = ""
@@ -97,6 +99,11 @@ type EventGrouping
     | GroupByDay
 
 
+type DateFilter
+    = NoDateFilter
+    | FilterByLast Int
+
+
 
 --
 -- MSG
@@ -114,12 +121,15 @@ type Msg
     | EventCreated (Result (Graphql.Http.Error (Maybe Event)) (Maybe Event))
     | MakeEvent
     | GotValueString String
+      --
+    | GotLogFilter String
+    | GotEventDateFilter String
     | SetGroupFilter EventGrouping
+    | SetDateFilter DateFilter
+      --
     | GotLogName String
     | TC TimerCommand
     | GotYScaleFactor String
-    | GotLogFilter String
-    | GotEventDateFilter String
 
 
 
@@ -184,7 +194,17 @@ update sharedState msg model =
             ( { model | logFilterString = str }, Cmd.none, UpdateCurrentLog Nothing )
 
         GotEventDateFilter str ->
-            ( { model | eventDateFilterString = str }, Cmd.none, NoUpdate )
+            case String.toInt str of
+                Nothing ->
+                    ( { model | dateFilter = NoDateFilter, eventDateFilterString = str }, Cmd.none, NoUpdate )
+
+                Just k ->
+                    case k <= 0 of
+                        True ->
+                            ( { model | dateFilter = NoDateFilter, eventDateFilterString = str }, Cmd.none, NoUpdate )
+
+                        False ->
+                            ( { model | dateFilter = FilterByLast k, eventDateFilterString = str }, Cmd.none, NoUpdate )
 
         GetEvents logId ->
             let
@@ -231,6 +251,9 @@ update sharedState msg model =
         SetGroupFilter filterState ->
             ( { model | filterState = filterState }, Cmd.none, NoUpdate )
 
+        SetDateFilter dateFilter_ ->
+            ( { model | dateFilter = dateFilter_ }, Cmd.none, NoUpdate )
+
         TC timerCommand ->
             case timerCommand of
                 TCStart ->
@@ -264,6 +287,7 @@ view sharedState model =
         [ row [ spacing 8 ]
             [ el [ Font.bold ] (text "Filter:")
             , inputLogNameFilter model
+            , el [ Font.bold ] (text "Since:")
             , inputEventDateFilter model
             ]
         , row [ spacing 12 ]
@@ -385,23 +409,6 @@ filterLogs filter logs =
     List.filter (\log -> String.contains (String.toLower filter) (String.toLower log.name)) logs
 
 
-
---filterLogsButton : Element Msg
---filterLogsButton =
---    Input.button Style.button
---        { onPress = Just FilterLogs
---        , label = Element.text "Filter"
---        }
---
---
---unFilterLogsButton : Element Msg
---unFilterLogsButton =
---    Input.button Style.button
---        { onPress = Just UnFilterLogs
---        , label = Element.text "Show all"
---        }
-
-
 logNameButton : Maybe Log -> Log -> Element Msg
 logNameButton currentLog log =
     Input.button (Style.titleButton (currentLog == Just log))
@@ -448,6 +455,35 @@ eventsPanel sharedState model =
 -}
 
 
+groupingFilter : Int -> EventGrouping -> List Event -> List Event
+groupingFilter timeZoneOffset eventGrouping eventList =
+    case eventGrouping of
+        NoGrouping ->
+            Data.correctTimeZone timeZoneOffset eventList
+
+        GroupByDay ->
+            Data.eventsByDay timeZoneOffset eventList
+
+
+dateFilter : String -> DateFilter -> List Event -> List Event
+dateFilter todayAsString dateFilter_ eventList =
+    case dateFilter_ of
+        NoDateFilter ->
+            eventList
+
+        FilterByLast k ->
+            List.filter (\event -> Utility.DateTime.inLastNDaysBeforeDate todayAsString k (naiveDateTimeValue event.insertedAt) == Just True) eventList
+
+
+naiveDateTimeValue : NaiveDateTime -> String
+naiveDateTimeValue (NaiveDateTime str) =
+    str
+
+
+
+-- model.timeZoneOffset
+
+
 viewEvents : SharedState -> Model -> Element Msg
 viewEvents sharedState model =
     case sharedState.currentEventList of
@@ -456,18 +492,19 @@ viewEvents sharedState model =
                 [ el [ Font.size 16, Font.bold ] (text "No events available")
                 ]
 
-        Just events_ ->
+        Just events1 ->
             let
+                today =
+                    Utility.DateTime.naiveDateStringFromPosix sharedState.currentTime
+
+                events2 =
+                    dateFilter today model.dateFilter events1
+
                 eventSum_ =
-                    eventSum events_
+                    eventSum events2
 
                 events =
-                    case model.filterState of
-                        NoGrouping ->
-                            Data.correctTimeZone model.timeZoneOffset events_
-
-                        GroupByDay ->
-                            Data.eventsByDay model.timeZoneOffset events_
+                    groupingFilter model.timeZoneOffset model.filterState events2
             in
             column [ spacing 12, padding 20, height (px 430), scrollbarY ]
                 [ el [ Font.size 16, Font.bold ] (text "Events")
@@ -650,7 +687,7 @@ inputLogNameFilter model =
 inputEventDateFilter model =
     Input.text inputStyle
         { onChange = GotEventDateFilter
-        , text = model.logFilterString
+        , text = model.eventDateFilterString
         , placeholder = Nothing
         , label = Input.labelLeft [ Font.size 14, moveDown 8 ] (text "")
         }

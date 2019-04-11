@@ -12,6 +12,10 @@ import Time exposing (Posix)
 import Url exposing (Url)
 
 
+tickInterval =
+    60
+
+
 main : Program Flags Model Msg
 main =
     Browser.application
@@ -29,7 +33,7 @@ subscriptions model =
         [ OutsideInfo.getInfoFromOutside Outside LogErr
         , case Configuration.site == "LOCAL" of
             True ->
-                Time.every 1000 TimeChange
+                Time.every (1000 * tickInterval) TimeChange
 
             False ->
                 Time.every 1000 TimeChange

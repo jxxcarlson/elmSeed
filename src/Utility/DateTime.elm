@@ -2,6 +2,7 @@ module Utility.DateTime exposing
     ( dateFromNaiveDateTime
     , dateFromNaiveDateTime2
     , daysBetweenNaiveDates
+    , inLastNDaysBeforeDate
     , isoStringFromNaiveDateTime
     , naiveDateStringFromPosix
     , offsetDateTimeStringByHours
