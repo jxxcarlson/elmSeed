@@ -9,7 +9,6 @@ module Pages.Logs exposing
 
 --
 
-import Common.BarGraph as BarGraph
 import Common.Style as Style
 import Common.Utility as Utility
 import Configuration
@@ -18,26 +17,11 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
+import Graph exposing (Option(..))
 import Graphql.Http
 import Graphql.Operation exposing (RootQuery)
 import Graphql.OptionalArgument exposing (OptionalArgument(..))
 import Graphql.SelectionSet as SelectionSet exposing (SelectionSet, with)
-import Json.Decode as Decode exposing (Decoder)
-import LineChart
-import LineChart.Area as Area
-import LineChart.Axis as Axis
-import LineChart.Axis.Intersection as Intersection
-import LineChart.Axis.Tick as Tick
-import LineChart.Axis.Ticks as Ticks
-import LineChart.Colors as Colors
-import LineChart.Container as Container
-import LineChart.Dots as Dots
-import LineChart.Events as Events
-import LineChart.Grid as Grid
-import LineChart.Interpolation as Interpolation
-import LineChart.Junk as Junk
-import LineChart.Legends as Legends
-import LineChart.Line as Line
 import Logger.Enum.LogTypeValue as LogTypeValue exposing (LogTypeValue(..))
 import Logger.Mutation as Mutation exposing (CreateEventRequiredArguments, CreateLogRequiredArguments, createEvent, createLog)
 import Logger.Object
@@ -49,6 +33,10 @@ import SharedState exposing (Event, Log, SharedState, SharedStateUpdate(..))
 import Time exposing (Posix)
 import Utility.Data as Data
 import Utility.DateTime exposing (offsetDateTimeStringByHours, rataDieFromNaiveDateTime)
+
+
+authorizationHeader =
+    "Bearer 1f26cbfff22e414099a33666d9f3e699"
 
 
 type alias Model =
@@ -744,7 +732,7 @@ getLogs : Int -> Cmd Msg
 getLogs userId =
     logQuery userId
         |> Graphql.Http.queryRequest (Configuration.backend ++ "/graphiql")
-        -- |> Graphql.Http.withHeader "authorization" "Bearer <your github bearer token>"
+        |> Graphql.Http.withHeader "authorization" authorizationHeader
         -- |> Graphql.Http.withHeader "Access-Control-Allow-Origin" "http://localhost:4000"
         |> Graphql.Http.send GotLogs
 
@@ -762,6 +750,7 @@ logMutation userId name logType =
 makeLog userId name logType =
     logMutation userId name logType logSelection
         |> Graphql.Http.mutationRequest (Configuration.backend ++ "/graphiql")
+        |> Graphql.Http.withHeader "authorization" authorizationHeader
         |> Graphql.Http.send LogCreated
 
 
@@ -782,6 +771,7 @@ fpEventMutation logId value =
 makeEvent logId value =
     fpEventMutation logId value eventSelection
         |> Graphql.Http.mutationRequest (Configuration.backend ++ "/graphiql")
+        |> Graphql.Http.withHeader "authorization" authorizationHeader
         |> Graphql.Http.send EventCreated
 
 
@@ -805,6 +795,7 @@ getEvents : Int -> Cmd Msg
 getEvents logId =
     eventQuery logId
         |> Graphql.Http.queryRequest (Configuration.backend ++ "/graphiql")
+        |> Graphql.Http.withHeader "authorization" authorizationHeader
         |> Graphql.Http.send GotEvents
 
 
@@ -817,29 +808,6 @@ query1 =
 --
 -- CHART
 --
-
-
-chart1 : SharedState -> Model -> Element msg
-chart1 sharedState model =
-    case sharedState.currentEventList of
-        Nothing ->
-            Element.none
-
-        Just eventList_ ->
-            let
-                events =
-                    case model.filterState of
-                        NoGrouping ->
-                            Data.correctTimeZone model.timeZoneOffset eventList_
-
-                        GroupByDay ->
-                            Data.eventsByDay model.timeZoneOffset eventList_
-            in
-            column [ Font.size 12 ]
-                [ LineChart.viewCustom chartConfig
-                    [ LineChart.line Colors.blue Dots.square "Events" (prepareData events) ]
-                    |> Element.html
-                ]
 
 
 chart : SharedState -> Model -> Element Msg
@@ -859,7 +827,7 @@ chart sharedState model =
                             Data.eventsByDay model.timeZoneOffset eventList_
             in
             column [ Font.size 12, spacing 36, moveRight 40, width (px 450) ]
-                [ row [] [ BarGraph.asHtml gA (prepareData2 (getScaleFactor model) events) |> Element.html ]
+                [ row [] [ Graph.barChart gA (prepareData (getScaleFactor model) events) |> Element.html ]
                 , row [ spacing 8 ]
                     [ el [] (text "Scale factor")
                     , inputYScaleFactor model
@@ -878,53 +846,23 @@ getScaleFactor model =
 
 
 gA =
-    { dx = 10
-    , color = "blue"
-    , barHeight = 200
+    { graphHeight = 200
     , graphWidth = 400
+    , options = [ Color "blue", XTickmarks 7, DeltaX 10 ]
     }
 
 
-prepareData : List Event -> List Data
-prepareData eventList =
-    eventList
-        |> List.map .value
-        |> List.indexedMap Tuple.pair
-        |> List.map dataFromPair
+floatValueOfEvent : Float -> Event -> Float
+floatValueOfEvent scaleFactor_ event =
+    event |> .value |> String.toFloat |> Maybe.withDefault 0 |> (\x -> x / scaleFactor_)
 
 
-prepareData2 : Float -> List Event -> List Float
-prepareData2 scaleFactor_ eventList =
-    eventList
-        |> List.map .value
-        |> List.map String.toFloat
-        |> List.map (Maybe.withDefault -999.0)
-        |> List.map (\x -> x / scaleFactor_)
-
-
-dataFromPair : ( Int, String ) -> Data
-dataFromPair ( a, b ) =
-    { index = toFloat a, value = String.toFloat b |> Maybe.withDefault 0 }
+prepareData : Float -> List Event -> List Float
+prepareData scaleFactor_ eventList =
+    List.map (floatValueOfEvent scaleFactor_) eventList
 
 
 type alias Data =
     { index : Float
     , value : Float
-    }
-
-
-chartConfig : LineChart.Config Data msg
-chartConfig =
-    { x = Axis.full 800 "index" .index
-    , y = Axis.full 400 "Value" .value
-    , container = Container.default "line-chart-1"
-    , interpolation = Interpolation.monotone
-    , intersection = Intersection.default
-    , legends = Legends.none
-    , events = Events.default
-    , junk = Junk.default
-    , grid = Grid.default
-    , area = Area.stacked 0.3 -- Changed from the default!
-    , line = Line.wider 2
-    , dots = Dots.default
     }

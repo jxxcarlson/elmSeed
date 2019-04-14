@@ -13,7 +13,7 @@ import Url exposing (Url)
 
 
 tickInterval =
-    60
+    1
 
 
 main : Program Flags Model Msg

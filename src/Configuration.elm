@@ -19,4 +19,4 @@ localbackend =
 
 
 site =
-    "LOCAL"
+    "REMOTE"
