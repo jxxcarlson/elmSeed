@@ -10,11 +10,11 @@ module Configuration exposing (backend, site)
 --
 
 
-remote_backend =
+backend =
     "https://sleepy-thicket-56112.herokuapp.com"
 
 
-backend =
+localbackend =
     "http://localhost:4000"
 
 
