@@ -1,9 +1,4 @@
-module Utility.TypedTime exposing
-    ( TypedTime(..)
-    , Unit(..)
-    , convertTo
-    , timeAsStringWithUnit
-    )
+module Utility.TypedTime exposing (TypedTime(..), Unit(..), convertTo, timeAsStringWithUnit)
 
 
 type Unit

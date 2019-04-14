@@ -33,6 +33,11 @@ import SharedState exposing (Event, Log, SharedState, SharedStateUpdate(..))
 import Time exposing (Posix)
 import Utility.Data as Data
 import Utility.DateTime exposing (offsetDateTimeStringByHours, rataDieFromNaiveDateTime)
+import Utility.TypedTime exposing (Unit(..))
+
+
+
+-- exposing (TypedTime(..), Unit(..), convertTo, timeAsStringWithUnit)
 
 
 authorizationHeader =
@@ -50,6 +55,8 @@ type alias Model =
     , timeZoneOffset : Int
     , timerState : TimerState
     , yScaleFactor : String
+    , inputUnit : Unit
+    , outputUnit : Unit
     }
 
 
@@ -65,6 +72,8 @@ initModel =
     , timeZoneOffset = -4
     , timerState = TSInitial
     , yScaleFactor = "60.0"
+    , inputUnit = Minutes
+    , outputUnit = Minutes
     }
 
 
