@@ -242,10 +242,15 @@ update sharedState msg model =
                     ( { model | message = "No log available to make event" }, Cmd.none, NoUpdate )
 
                 Just log ->
-                    ( { model | message = "Making new event for log " ++ String.fromInt log.id }
-                    , makeEvent log.id (60 * floatValueFromString model.inputUnit model.valueString)
-                    , NoUpdate
-                    )
+                    case TypedTime.decodeHM model.valueString of
+                        Nothing ->
+                            ( { model | message = "Bad format for time" }, Cmd.none, NoUpdate )
+
+                        Just duration ->
+                            ( { model | message = "Making new event for log " ++ String.fromInt log.id }
+                            , makeEvent log.id duration
+                            , NoUpdate
+                            )
 
         SetGroupFilter filterState ->
             ( { model | filterState = filterState }, Cmd.none, NoUpdate )
@@ -331,11 +336,15 @@ timerPanel sharedState model =
         , pauseTimerButton model
         , resetTimerButton
         , logTimerButton
-        , row [ spacing 8 ]
-            [ el [ Font.bold ] (text "Elapsed time")
-            , el [ Font.size 16, Font.bold, padding 8, Font.color Style.red, Background.color Style.black ]
-                (text <| timeStringFromFloat <| (sharedState.accumulatedTime + sharedState.elapsedTime) / scaleFactor)
-            ]
+        , elapsedTimePanel sharedState model
+        ]
+
+
+elapsedTimePanel sharedState model =
+    row [ spacing 8 ]
+        [ el [ Font.bold ] (text "Elapsed time")
+        , el [ Font.size 16, Font.bold, padding 8, Font.color Style.red, Background.color Style.black ]
+            (text <| timeStringFromFloat <| (sharedState.accumulatedTime + sharedState.elapsedTime) / scaleFactor)
         ]
 
 

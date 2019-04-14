@@ -1,4 +1,13 @@
-module Utility.TypedTime exposing (TypedTime(..), Unit(..), convertScalarToSecondsWithUnit, convertTo, timeAsStringWithUnit)
+module Utility.TypedTime exposing
+    ( TypedTime(..)
+    , Unit(..)
+    , convertScalarToSecondsWithUnit
+    , convertTo
+    , decodeHM
+    , timeAsStringWithUnit
+    )
+
+import Parser exposing (..)
 
 
 type Unit
@@ -74,7 +83,7 @@ type alias HMSRecord =
 
 
 type alias HMRecord =
-    { minutes : Int, hours : Int }
+    { hours : Int, minutes : Int }
 
 
 hmsRecordFromSeconds : Float -> HMSRecord
@@ -140,3 +149,49 @@ hmStringFromSeconds s =
     (String.padLeft 2 '0' <| String.fromInt tr.hours)
         ++ ":"
         ++ (String.padLeft 2 '0' <| String.fromInt tr.minutes)
+
+
+
+--
+-- TIME PARSER
+--
+
+
+decodeHM : String -> Maybe Float
+decodeHM str =
+    Parser.run parseHM str |> Result.toMaybe
+
+
+{-| run parseHM takes a string in the format hh:mm as
+input and returns the resulting time in seconds.
+
+> run parseHM "02:10"
+
+    Ok 7800 : Result (List DeadEnd) Float
+
+-}
+parseHM : Parser Float
+parseHM =
+    (succeed HMRecord
+        |= parseInt
+        |. symbol ":"
+        |= parseInt
+    )
+        |> Parser.map (\hm -> hm.hours * 3600 + hm.minutes * 60 |> toFloat)
+
+
+parseTime : Parser Float
+parseTime =
+    oneOf [ backtrackable parseHM, float ]
+
+
+parseInt_ : Parser Int
+parseInt_ =
+    succeed identity
+        |. symbol "0"
+        |= int
+
+
+parseInt : Parser Int
+parseInt =
+    oneOf [ parseInt_, int ]
