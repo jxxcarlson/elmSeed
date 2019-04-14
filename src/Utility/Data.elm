@@ -41,8 +41,7 @@ e4 =
 timeSeries : List Event -> List ( NaiveDateTime, Float )
 timeSeries eventList =
     eventList
-        |> List.map (\event -> ( event.insertedAt, String.toFloat event.value ))
-        |> filterValues
+        |> List.map (\event -> ( event.insertedAt, event.value ))
 
 
 timeSeriesRD : List ( NaiveDateTime, Float ) -> List ( Int, ( NaiveDateTime, Float ) )
@@ -138,7 +137,7 @@ sumList2 list =
         sum =
             List.map (Tuple.second >> Tuple.second) list |> List.sum
     in
-    { id = index + 1, insertedAt = dt, value = String.fromFloat sum }
+    { id = index + 1, insertedAt = dt, value = sum }
 
 
 sumList : List ( Int, Float ) -> ( Maybe Int, Float )

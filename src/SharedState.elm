@@ -44,7 +44,7 @@ type alias Log =
 
 type alias Event =
     { id : Int
-    , value : String
+    , value : Float
     , insertedAt : NaiveDateTime
     }
 

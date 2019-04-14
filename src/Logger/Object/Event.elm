@@ -2,7 +2,7 @@
 -- https://github.com/dillonkearns/elm-graphql
 
 
-module Logger.Object.Event exposing (id, insertedAt, logId, value, value2)
+module Logger.Object.Event exposing (id, insertedAt, logId, unit, value)
 
 import Graphql.Internal.Builder.Argument as Argument exposing (Argument)
 import Graphql.Internal.Builder.Object as Object
@@ -34,11 +34,11 @@ logId =
     Object.selectionForField "Int" "logId" [] Decode.int
 
 
-value : SelectionSet String Logger.Object.Event
+unit : SelectionSet String Logger.Object.Event
+unit =
+    Object.selectionForField "String" "unit" [] Decode.string
+
+
+value : SelectionSet Float Logger.Object.Event
 value =
-    Object.selectionForField "String" "value" [] Decode.string
-
-
-value2 : SelectionSet Float Logger.Object.Event
-value2 =
-    Object.selectionForField "Float" "value2" [] Decode.float
+    Object.selectionForField "Float" "value" [] Decode.float

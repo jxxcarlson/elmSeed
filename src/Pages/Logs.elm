@@ -33,7 +33,7 @@ import SharedState exposing (Event, Log, SharedState, SharedStateUpdate(..))
 import Time exposing (Posix)
 import Utility.Data as Data
 import Utility.DateTime exposing (offsetDateTimeStringByHours, rataDieFromNaiveDateTime)
-import Utility.TypedTime exposing (Unit(..))
+import Utility.TypedTime as TypedTime exposing (TypedTime(..), Unit(..))
 
 
 
@@ -72,7 +72,7 @@ initModel =
     , timeZoneOffset = -4
     , timerState = TSInitial
     , yScaleFactor = "60.0"
-    , inputUnit = Minutes
+    , inputUnit = Seconds
     , outputUnit = Minutes
     }
 
@@ -127,6 +127,8 @@ type Msg
     | GotLogName String
     | TC TimerCommand
     | GotYScaleFactor String
+      --
+    | SetUnits Unit
 
 
 
@@ -241,7 +243,7 @@ update sharedState msg model =
 
                 Just log ->
                     ( { model | message = "Making new event for log " ++ String.fromInt log.id }
-                    , makeEvent log.id model.valueString
+                    , makeEvent log.id (60 * floatValueFromString model.inputUnit model.valueString)
                     , NoUpdate
                     )
 
@@ -250,6 +252,9 @@ update sharedState msg model =
 
         SetDateFilter dateFilter_ ->
             ( { model | dateFilter = dateFilter_ }, Cmd.none, NoUpdate )
+
+        SetUnits unit ->
+            ( { model | outputUnit = unit }, Cmd.none, NoUpdate )
 
         TC timerCommand ->
             case timerCommand of
@@ -270,7 +275,7 @@ update sharedState msg model =
                                     Cmd.none
 
                                 Just log ->
-                                    makeEvent log.id (String.fromFloat (Utility.roundTo 6 <| (sharedState.accumulatedTime + sharedState.elapsedTime) / 60.0))
+                                    makeEvent log.id (TypedTime.convertScalarToSecondsWithUnit model.inputUnit (sharedState.accumulatedTime + sharedState.elapsedTime))
                     in
                     ( { model | timerState = TSInitial }, cmd, ResetTimer )
 
@@ -281,30 +286,38 @@ update sharedState msg model =
 view : SharedState -> Model -> Element Msg
 view sharedState model =
     column (Style.mainColumn fill fill ++ [ spacing 12, padding 40, Background.color (Style.makeGrey 0.9) ])
-        [ row [ spacing 8 ]
-            [ el [ Font.bold ] (text "Filter:")
-            , inputLogNameFilter model
-            , el [ Font.bold ] (text "Since:")
-            , inputEventDateFilter model
-            ]
+        [ filterPanel model
         , row [ spacing 12 ]
             [ logListPanel sharedState model
             , eventsPanel sharedState model
             , chart sharedState model
             ]
-        , column [ padding 8, Border.width 1, width (px 562), spacing 12 ]
-            [ row [ spacing 140, alignBottom ]
-                [ row [ spacing 12, Font.size 14 ]
-                    [ getLogsButton
-                    ]
-                , row [ spacing 24, Font.size 14 ]
-                    [ row [ spacing 8 ] [ submitEventButton, inputValue model ]
-                    , row [ spacing 8 ] [ el [ Font.bold ] (text "Group:"), noFilterButton model, filterByDayButton model ]
-                    ]
+        , controlPanel sharedState model
+        ]
+
+
+filterPanel model =
+    row [ spacing 8 ]
+        [ el [ Font.bold ] (text "Filter:")
+        , inputLogNameFilter model
+        , el [ Font.bold ] (text "Since:")
+        , inputEventDateFilter model
+        ]
+
+
+controlPanel sharedState model =
+    column [ padding 8, Border.width 1, width (px 562), spacing 12 ]
+        [ row [ spacing 140, alignBottom ]
+            [ row [ spacing 12, Font.size 14 ]
+                [ getLogsButton
                 ]
-            , timerPanel sharedState model
-            , newLogPanel model
+            , row [ spacing 24, Font.size 14 ]
+                [ row [ spacing 8 ] [ submitEventButton, inputValue model ]
+                , row [ spacing 8 ] [ el [ Font.bold ] (text "Group:"), noFilterButton model, filterByDayButton model ]
+                ]
             ]
+        , timerPanel sharedState model
+        , newLogPanel model
         ]
 
 
@@ -437,21 +450,6 @@ eventsPanel sharedState model =
         ]
 
 
-
-{-
-
-   case model.eventDateFilterString of
-          Nothing ->
-
-      let
-          todayND =
-              Utility.DateTime.naiveDateStringFromPosix sharedState.currentTime |> Debug.log "TODAY"
-
-          inLastNDaysBeforeDate endDate interval
-      in
--}
-
-
 groupingFilter : Int -> EventGrouping -> List Event -> List Event
 groupingFilter timeZoneOffset eventGrouping eventList =
     case eventGrouping of
@@ -500,6 +498,7 @@ viewEvents sharedState model =
                 eventSum_ =
                     eventSum events2
 
+                events : List Event
                 events =
                     groupingFilter model.timeZoneOffset model.filterState events2
             in
@@ -526,39 +525,34 @@ viewEvents sharedState model =
                           }
                         , { header = el [ Font.bold ] (text "Value")
                           , width = px 40
-                          , view = \k event -> el [ Font.size 12 ] (text <| formatValue model.yScaleFactor 2 <| event.value)
+
+                          -- , view = \k event -> el [ Font.size 12 ] (text <| formatValue model <| event.value)
+                          , view = \k event -> el [ Font.size 12 ] (text <| TypedTime.timeAsStringWithUnit Minutes (TypedTime Seconds event.value))
                           }
                         ]
                     }
                 , row [ spacing 12, alignBottom ]
-                    [ el [ Font.size 12 ] (text <| "Minutes: " ++ String.fromFloat (Utility.roundTo 1 eventSum_))
-                    , el [ Font.size 12 ] (text <| "Hours: " ++ String.fromFloat (Utility.roundTo 1 (eventSum_ / 60)))
+                    [ el [ Font.size 12 ] (text <| "Total: " ++ TypedTime.timeAsStringWithUnit Minutes eventSum_)
                     ]
                 ]
 
 
-formatValue : String -> Int -> String -> String
-formatValue scaleFactor_ k yString =
-    case String.toFloat yString of
-        Nothing ->
-            yString
-
-        Just y ->
-            case String.toFloat scaleFactor_ of
-                Nothing ->
-                    yString
-
-                Just f_ ->
-                    Utility.roundTo k (y / f_)
-                        |> String.fromFloat
+formatValue : Model -> Float -> String
+formatValue model v =
+    TypedTime.timeAsStringWithUnit model.outputUnit (TypedTime Seconds v)
 
 
-eventSum : List Event -> Float
+formatValueForUnit : Unit -> Float -> String
+formatValueForUnit unit v =
+    TypedTime.timeAsStringWithUnit unit (TypedTime Seconds v)
+
+
+eventSum : List Event -> TypedTime
 eventSum eventList =
     eventList
         |> List.map .value
-        |> List.map (\str -> String.toFloat str |> Maybe.withDefault 0)
         |> List.sum
+        |> TypedTime Seconds
 
 
 dateStringOfDateTimeString : String -> String
@@ -582,6 +576,22 @@ timeStringOfDateTimeString str =
 --
 -- BUTTON
 --
+
+
+setMinutesButton : Model -> Element Msg
+setMinutesButton model =
+    Input.button (Style.activeButton (model.outputUnit == Minutes))
+        { onPress = Just (SetUnits Minutes)
+        , label = el [ Font.size 12 ] (text "Minutes")
+        }
+
+
+setHoursButton : Model -> Element Msg
+setHoursButton model =
+    Input.button (Style.activeButton (model.outputUnit == Hours))
+        { onPress = Just (SetUnits Hours)
+        , label = el [ Font.size 12 ] (text "Hours")
+        }
 
 
 {-| xxx
@@ -770,11 +780,19 @@ eventQuery logId =
 
 fpEventMutation :
     Int
-    -> String
+    -> Float
     -> SelectionSet decodesTo Logger.Object.Event
     -> SelectionSet (Maybe decodesTo) Graphql.Operation.RootMutation
 fpEventMutation logId value =
     Mutation.createEvent { logId = logId, value = value }
+
+
+floatValueFromString : Unit -> String -> Float
+floatValueFromString inputUnit str =
+    str
+        |> String.toFloat
+        |> Maybe.withDefault 0
+        |> TypedTime.convertScalarToSecondsWithUnit inputUnit
 
 
 makeEvent logId value =
@@ -836,34 +854,41 @@ chart sharedState model =
                             Data.eventsByDay model.timeZoneOffset eventList_
             in
             column [ Font.size 12, spacing 36, moveRight 40, width (px 450) ]
-                [ row [] [ Graph.barChart gA (prepareData (getScaleFactor model) events) |> Element.html ]
+                [ row [] [ Graph.barChart (gA model) (prepareData (getScaleFactor model) events) |> Element.html ]
                 , row [ spacing 8 ]
-                    [ el [] (text "Scale factor")
-                    , inputYScaleFactor model
+                    [ setMinutesButton model
+                    , setHoursButton model
                     ]
                 ]
 
 
 getScaleFactor : Model -> Float
 getScaleFactor model =
-    case String.toFloat model.yScaleFactor of
-        Nothing ->
-            1.0
+    case model.outputUnit of
+        Seconds ->
+            1
 
-        Just f ->
-            f
+        Minutes ->
+            60.0
+
+        Hours ->
+            3600.0
 
 
-gA =
+gA model =
+    let
+        yTickMarks_ =
+            4
+    in
     { graphHeight = 200
     , graphWidth = 400
-    , options = [ Color "blue", XTickmarks 7, DeltaX 10 ]
+    , options = [ Color "blue", XTickmarks 7, YTickmarks yTickMarks_, DeltaX 10 ]
     }
 
 
 floatValueOfEvent : Float -> Event -> Float
 floatValueOfEvent scaleFactor_ event =
-    event |> .value |> String.toFloat |> Maybe.withDefault 0 |> (\x -> x / scaleFactor_)
+    event |> .value |> (\x -> x / scaleFactor_)
 
 
 prepareData : Float -> List Event -> List Float

@@ -1,4 +1,4 @@
-module Utility.TypedTime exposing (TypedTime(..), Unit(..), convertTo, timeAsStringWithUnit)
+module Utility.TypedTime exposing (TypedTime(..), Unit(..), convertScalarToSecondsWithUnit, convertTo, timeAsStringWithUnit)
 
 
 type Unit
@@ -9,6 +9,15 @@ type Unit
 
 type TypedTime
     = TypedTime Unit Float
+
+
+convertScalarToSecondsWithUnit : Unit -> Float -> Float
+convertScalarToSecondsWithUnit inputUnit scalar =
+    let
+        inputValue =
+            TypedTime inputUnit scalar
+    in
+    convertToSeconds inputValue
 
 
 convertToSeconds : TypedTime -> Float
