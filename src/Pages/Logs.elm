@@ -59,6 +59,7 @@ type alias Model =
     , inputUnit : Unit
     , outputUnit : Unit
     , appMode : AppMode
+    , currentEvent : Maybe Event
     }
 
 
@@ -78,6 +79,7 @@ initModel =
     , inputUnit = Seconds
     , outputUnit = Minutes
     , appMode = Logging
+    , currentEvent = Nothing
     }
 
 
@@ -140,6 +142,7 @@ type Msg
       --
     | SetUnits Unit
     | SetAppMode AppMode
+    | SetCurrentEvent Event
 
 
 
@@ -312,6 +315,9 @@ update sharedState msg model =
                 ( Just _, Just _ ) ->
                     ( { model | appMode = nextAppMode }, Cmd.none, NoUpdate )
 
+        SetCurrentEvent event_ ->
+            ( { model | currentEvent = Just event_ }, Cmd.none, NoUpdate )
+
 
 view : SharedState -> Model -> Element Msg
 view sharedState model =
@@ -342,6 +348,7 @@ editPanel sharedState model =
         [ el [ Font.size 16, Font.bold, alignTop ] (text "Edit Panel")
         , editLogNameInput model
         , row [ spacing 12 ] [ updateLogButton, deleteLogButton ]
+        , row [ spacing 12 ] [ deleteEventButton model ]
         ]
 
 
@@ -366,8 +373,21 @@ deleteLogButton : Element Msg
 deleteLogButton =
     Input.button Style.button
         { onPress = Just NoOp
-        , label = Element.text "Update"
+        , label = Element.text "Remove log"
         }
+
+
+deleteEventButton : Model -> Element Msg
+deleteEventButton model =
+    case model.currentEvent of
+        Nothing ->
+            Element.none
+
+        Just event_ ->
+            Input.button Style.button
+                { onPress = Just NoOp
+                , label = Element.text <| "Remove event " ++ String.fromInt event_.id
+                }
 
 
 
@@ -496,6 +516,14 @@ filterLogs filter logs =
     List.filter (\log -> String.contains (String.toLower filter) (String.toLower log.name)) logs
 
 
+logNameButton : Maybe Log -> Log -> Element Msg
+logNameButton currentLog log =
+    Input.button (Style.titleButton (currentLog == Just log))
+        { onPress = Just (GetEvents log.id)
+        , label = Element.text log.name
+        }
+
+
 noFilterButton : Model -> Element Msg
 noFilterButton model =
     Input.button (Style.activeButton (model.filterState == NoGrouping))
@@ -582,9 +610,9 @@ viewEvents sharedState model =
                 , indexedTable [ spacing 4, Font.size 12 ]
                     { data = events
                     , columns =
-                        [ { header = el [ Font.bold ] (text "index")
-                          , width = px 40
-                          , view = \k event -> el [ Font.size 12 ] (text <| String.fromInt <| k + 1)
+                        [ { header = el [ Font.bold ] (text "idx")
+                          , width = px (indexWidth model.appMode)
+                          , view = indexButton model
                           }
                         , { header = el [ Font.bold ] (text "Date")
                           , width = px 80
@@ -605,6 +633,38 @@ viewEvents sharedState model =
                     , el [ moveLeft 10, Font.size 16, Font.bold ] (text <| "Total: " ++ TypedTime.timeAsStringWithUnit Minutes eventSum_)
                     ]
                 ]
+
+
+indexWidth : AppMode -> Int
+indexWidth appMode =
+    case appMode of
+        Logging ->
+            30
+
+        Editing ->
+            60
+
+
+indexButton : Model -> Int -> Event -> Element Msg
+indexButton model k event =
+    case model.appMode of
+        Logging ->
+            el [ Font.size 12 ] (text <| String.fromInt <| k + 1)
+
+        Editing ->
+            setCurrentEventButton model event k
+
+
+
+-- el [ Font.size 12 ] (text <| String.fromInt <| k + 1)
+
+
+setCurrentEventButton : Model -> Event -> Int -> Element Msg
+setCurrentEventButton model event index =
+    Input.button (Style.titleButton (Just event == model.currentEvent))
+        { onPress = Just (SetCurrentEvent event)
+        , label = el [ Font.bold ] (Element.text <| String.fromInt index ++ ", " ++ String.fromInt event.id)
+        }
 
 
 formatValue : Model -> Float -> String
