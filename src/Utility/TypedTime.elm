@@ -4,6 +4,7 @@ module Utility.TypedTime exposing
     , convertScalarToSecondsWithUnit
     , convertTo
     , decodeHM
+    , multiply
     , timeAsStringWithUnit
     )
 
@@ -18,6 +19,11 @@ type Unit
 
 type TypedTime
     = TypedTime Unit Float
+
+
+multiply : Float -> TypedTime -> TypedTime
+multiply f (TypedTime unit value) =
+    TypedTime unit (f * value)
 
 
 convertScalarToSecondsWithUnit : Unit -> Float -> Float

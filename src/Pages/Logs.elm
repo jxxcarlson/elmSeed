@@ -50,6 +50,7 @@ type alias Model =
     , filterState : EventGrouping
     , dateFilter : DateFilter
     , logName : String
+    , updatedLogName : String
     , logFilterString : String
     , eventDateFilterString : String
     , timeZoneOffset : Int
@@ -57,6 +58,7 @@ type alias Model =
     , yScaleFactor : String
     , inputUnit : Unit
     , outputUnit : Unit
+    , appMode : AppMode
     }
 
 
@@ -67,6 +69,7 @@ initModel =
     , filterState = NoGrouping
     , dateFilter = NoDateFilter
     , logName = ""
+    , updatedLogName = ""
     , logFilterString = ""
     , eventDateFilterString = ""
     , timeZoneOffset = -4
@@ -74,7 +77,13 @@ initModel =
     , yScaleFactor = "60.0"
     , inputUnit = Seconds
     , outputUnit = Minutes
+    , appMode = Logging
     }
+
+
+type AppMode
+    = Logging
+    | Editing
 
 
 type TimerState
@@ -125,10 +134,12 @@ type Msg
     | SetDateFilter DateFilter
       --
     | GotLogName String
+    | GotUpdatedLogName String
     | TC TimerCommand
     | GotYScaleFactor String
       --
     | SetUnits Unit
+    | SetAppMode AppMode
 
 
 
@@ -144,6 +155,9 @@ update sharedState msg model =
 
         GotLogName str ->
             ( { model | logName = str }, Cmd.none, NoUpdate )
+
+        GotUpdatedLogName str ->
+            ( { model | updatedLogName = str }, Cmd.none, NoUpdate )
 
         GotYScaleFactor str ->
             ( { model | yScaleFactor = str }, Cmd.none, NoUpdate )
@@ -287,46 +301,99 @@ update sharedState msg model =
                 TCReset ->
                     ( { model | timerState = TSInitial }, Cmd.none, ResetTimer )
 
+        SetAppMode nextAppMode ->
+            case ( sharedState.currentUser, sharedState.currentLogList ) of
+                ( Nothing, _ ) ->
+                    ( { model | message = "No user signed in" }, Cmd.none, NoUpdate )
+
+                ( Just user, Nothing ) ->
+                    ( { model | appMode = nextAppMode }, getLogs user.id, NoUpdate )
+
+                ( Just _, Just _ ) ->
+                    ( { model | appMode = nextAppMode }, Cmd.none, NoUpdate )
+
 
 view : SharedState -> Model -> Element Msg
 view sharedState model =
     column (Style.mainColumn fill fill ++ [ spacing 12, padding 40, Background.color (Style.makeGrey 0.9) ])
-        [ filterPanel model
+        [ filterPanel sharedState model
         , row [ spacing 12 ]
             [ logListPanel sharedState model
-            , eventsPanel sharedState model
-            , chart sharedState model
+            , eventListDisplay sharedState model
+            , case model.appMode of
+                Logging ->
+                    eventPanel sharedState model
+
+                Editing ->
+                    editPanel sharedState model
             ]
         , controlPanel sharedState model
         ]
 
 
-filterPanel model =
+
+--
+-- EDIT PANEL
+--
+
+
+editPanel sharedState model =
+    column [ spacing 12, width (px 300), alignTop ]
+        [ el [ Font.size 16, Font.bold, alignTop ] (text "Edit Panel")
+        , editLogNameInput model
+        , row [ spacing 12 ] [ updateLogButton, deleteLogButton ]
+        ]
+
+
+editLogNameInput model =
+    Input.text (inputStyle ++ [ width (px 200) ])
+        { onChange = GotUpdatedLogName
+        , text = model.valueString
+        , placeholder = Nothing
+        , label = Input.labelLeft [ Font.size 16, moveDown 8 ] (text "New log name")
+        }
+
+
+updateLogButton : Element Msg
+updateLogButton =
+    Input.button Style.button
+        { onPress = Just NoOp
+        , label = Element.text "Update"
+        }
+
+
+deleteLogButton : Element Msg
+deleteLogButton =
+    Input.button Style.button
+        { onPress = Just NoOp
+        , label = Element.text "Update"
+        }
+
+
+
+--
+-- CONTINUE
+--
+
+
+filterPanel sharedState model =
     row [ spacing 8 ]
         [ el [ Font.bold ] (text "Filter:")
         , inputLogNameFilter model
         , el [ Font.bold ] (text "Since:")
         , inputEventDateFilter model
+        , row [ alignRight, moveRight 36, spacing 12 ] [ editModeButton sharedState model, logModeButton model ]
         ]
 
 
 controlPanel sharedState model =
     column [ padding 8, Border.width 1, width (px 562), spacing 12 ]
-        [ row [ spacing 140, alignBottom ]
-            [ row [ spacing 12, Font.size 14 ]
-                [ getLogsButton
-                ]
-            , row [ spacing 24, Font.size 14 ]
-                [ row [ spacing 8 ] [ submitEventButton, inputValue model ]
-                ]
-            ]
-        , newLogPanel model
-        ]
+        [ newLogPanel model ]
 
 
 largeElapsedTimePanel : SharedState -> Model -> Element Msg
 largeElapsedTimePanel sharedState model =
-    column [ spacing 12, padding 12, Border.width 1 ]
+    column [ spacing 12 ]
         [ timerDisplay sharedState model
         , timerControls sharedState model
         ]
@@ -429,14 +496,6 @@ filterLogs filter logs =
     List.filter (\log -> String.contains (String.toLower filter) (String.toLower log.name)) logs
 
 
-logNameButton : Maybe Log -> Log -> Element Msg
-logNameButton currentLog log =
-    Input.button (Style.titleButton (currentLog == Just log))
-        { onPress = Just (GetEvents log.id)
-        , label = Element.text log.name
-        }
-
-
 noFilterButton : Model -> Element Msg
 noFilterButton model =
     Input.button (Style.activeButton (model.filterState == NoGrouping))
@@ -453,8 +512,8 @@ filterByDayButton model =
         }
 
 
-eventsPanel : SharedState -> Model -> Element Msg
-eventsPanel sharedState model =
+eventListDisplay : SharedState -> Model -> Element Msg
+eventListDisplay sharedState model =
     column [ spacing 20, height (px 450), width (px 350), Border.width 1 ]
         [ viewEvents sharedState model
         ]
@@ -511,6 +570,12 @@ viewEvents sharedState model =
                 events : List Event
                 events =
                     groupingFilter model.timeZoneOffset model.filterState events2
+
+                nEvents =
+                    List.length events |> toFloat
+
+                average =
+                    TypedTime.multiply (1.0 / nEvents) eventSum_
             in
             column [ spacing 12, padding 20, height (px 430), scrollbarY ]
                 [ el [ Font.size 16, Font.bold ] (text "Events")
@@ -531,14 +596,13 @@ viewEvents sharedState model =
                           }
                         , { header = el [ Font.bold ] (text "Value")
                           , width = px 40
-
-                          -- , view = \k event -> el [ Font.size 12 ] (text <| formatValue model <| event.value)
                           , view = \k event -> el [ Font.size 12 ] (text <| TypedTime.timeAsStringWithUnit Minutes (TypedTime Seconds event.value))
                           }
                         ]
                     }
-                , row [ spacing 12, alignBottom ]
-                    [ el [ Font.size 12 ] (text <| "Total: " ++ TypedTime.timeAsStringWithUnit Minutes eventSum_)
+                , row [ spacing 24, alignBottom, alignRight ]
+                    [ el [ moveLeft 10, Font.size 16, Font.bold ] (text <| "Average: " ++ TypedTime.timeAsStringWithUnit Minutes average)
+                    , el [ moveLeft 10, Font.size 16, Font.bold ] (text <| "Total: " ++ TypedTime.timeAsStringWithUnit Minutes eventSum_)
                     ]
                 ]
 
@@ -592,6 +656,37 @@ timeStringOfDateTimeString str =
 --
 -- BUTTON
 --
+
+
+editModeButton : SharedState -> Model -> Element Msg
+editModeButton sharedState model =
+    case sharedState.currentLog of
+        Nothing ->
+            Element.none
+
+        Just _ ->
+            Input.button (Style.activeButton (model.appMode == Editing))
+                { onPress = Just (SetAppMode Editing)
+                , label = el [ Font.size 16 ] (text "Edit")
+                }
+
+
+logModeButton : Model -> Element Msg
+logModeButton model =
+    Input.button (Style.activeButton (model.appMode == Logging))
+        { onPress = Just (SetAppMode Logging)
+        , label = el [ Font.size 16 ] (text "Logs")
+        }
+
+
+editModeLabel : AppMode -> String
+editModeLabel appMode =
+    case appMode of
+        Editing ->
+            "Edit Logs, Events"
+
+        Logging ->
+            "Log events"
 
 
 setMinutesButton : Model -> Element Msg
@@ -664,7 +759,7 @@ submitEventButton : Element Msg
 submitEventButton =
     Input.button Style.button
         { onPress = Just MakeEvent
-        , label = Element.text "Submit"
+        , label = Element.text "New event"
         }
 
 
@@ -853,8 +948,8 @@ query1 =
 --
 
 
-chart : SharedState -> Model -> Element Msg
-chart sharedState model =
+eventPanel : SharedState -> Model -> Element Msg
+eventPanel sharedState model =
     case sharedState.currentEventList of
         Nothing ->
             Element.none
@@ -881,8 +976,16 @@ chart sharedState model =
                     [ row [ spacing 8 ] [ setMinutesButton model, setHoursButton model ]
                     , row [ spacing 8 ] [ el [ Font.bold, Font.size 14 ] (text "Group:"), noFilterButton model, filterByDayButton model ]
                     ]
-                , largeElapsedTimePanel sharedState model
+                , newEventPanel sharedState model
                 ]
+
+
+newEventPanel : SharedState -> Model -> Element Msg
+newEventPanel sharedState model =
+    column [ Border.width 1, padding 12, spacing 24 ]
+        [ row [ spacing 12 ] [ submitEventButton, inputValue model ]
+        , largeElapsedTimePanel sharedState model
+        ]
 
 
 getScaleFactor : Model -> Float
