@@ -1,13 +1,17 @@
 module Utility.Data exposing
     ( correctTimeZone
     , eventsByDay
+    , fillGaps
     , filterValues
+    , fst
+    , fstPlusOne
     , group
     , rataDie
     )
 
 import List.Extra as LE
 import Logger.Scalar exposing (NaiveDateTime(..))
+import Maybe.Extra
 import SharedState exposing (Event, Log)
 import Utility.DateTime exposing (offsetDateTimeStringByHours)
 
@@ -97,6 +101,8 @@ eventsByDay timeZoneOffset list =
         |> List.map (\r -> offsetTimeZone timeZoneOffset r)
         |> timeSeries
         |> timeSeriesRD
+        |> List.sortBy Tuple.first
+        |> fillGaps ( NaiveDateTime "1900-01-1", 0 )
         |> group
         |> List.map sumList2
 
@@ -155,3 +161,104 @@ sumList list =
 rataDie : NaiveDateTime -> Int
 rataDie (NaiveDateTime str) =
     Utility.DateTime.rataDieFromNaiveDateTime str - 737148
+
+
+{-|
+
+> import FillGaps
+> FillGaps.fillGaps "x" [(0,"a"),(0,"aa"),(2,"c"),(4,"e")][(0,"a"),(0,"aa"),(1,"x"),(2,"c"),(3,"x"),(4,"e")]
+
+Actually, needed to start acc at `(-1 , [])` if there's no leading zeros:
+
+    > [(0,"x"),(1,"x"),(2,"c"),(3,"x"),(4,"e")]```
+    And `fillGap` was missing a call to reverse I just edited in.
+
+    Folds are fun. You can keep as much state around as you want for the intermediate calculations and just throw it away when you're done
+
+-}
+fillGaps : a -> List ( Int, a ) -> List ( Int, a )
+fillGaps default =
+    let
+        fillGap start end =
+            List.range (start + 1) (end - 1)
+                |> List.map (\i -> ( i, default ))
+    in
+    List.reverse
+        << Tuple.second
+        << List.foldl
+            (\(( i, a ) as item) ( last, acc ) ->
+                if i == last then
+                    ( last, item :: acc )
+
+                else if i == last + 1 then
+                    ( last + 1, item :: acc )
+
+                else
+                    ( i, item :: fillGap last i ++ acc )
+            )
+            ( 0, [] )
+
+
+{-|
+
+    > fillGaps "x" [(0,"a"), (0, "aa"), (2, "c"), (4, "e")]
+    [(0,"a"),(0,"aa"),(1,"x"),(2,"c"),(3,"x"),(4,"e")]
+
+-}
+fillGaps1 : a -> List ( Int, a ) -> List ( Int, a )
+fillGaps1 default input =
+    fillGapsAux default [ List.head input ] (List.drop 1 input)
+        |> Maybe.Extra.values
+        |> List.reverse
+
+
+fillGapsAux : a -> List (Maybe ( Int, a )) -> List ( Int, a ) -> List (Maybe ( Int, a ))
+fillGapsAux default acc input =
+    case input of
+        [] ->
+            acc
+
+        _ ->
+            let
+                fpo =
+                    fstPlusOne acc
+            in
+            case Maybe.map2 (>=) fpo (fst input) == Just True of
+                True ->
+                    fillGapsAux default (List.head input :: acc) (List.drop 1 input)
+
+                False ->
+                    case fpo of
+                        Nothing ->
+                            fillGapsAux default (List.head input :: acc) (List.drop 1 input)
+
+                        Just k ->
+                            fillGapsAux default (Just ( k, default ) :: acc) input
+
+
+{-|
+
+    > fst [(0,"a"), (0, "aa"), (2, "c"), (4, "e")]
+    Just 0 : Maybe Int
+
+-}
+fst : List ( Int, a ) -> Maybe Int
+fst list =
+    Maybe.map Tuple.first (List.head list)
+
+
+{-|
+
+    > fstPlusOne [Just (0,"a"),Just (0,"aa"),Just (2,"c"),Just (4,"e")]
+    Just 1 : Maybe Int
+
+-}
+fstPlusOne : List (Maybe ( Int, a )) -> Maybe Int
+fstPlusOne list =
+    List.head list
+        |> Maybe.Extra.join
+        |> Maybe.map (\( i, a ) -> i + 1)
+
+
+
+--|> Maybe.map (\x -> x + 1)
