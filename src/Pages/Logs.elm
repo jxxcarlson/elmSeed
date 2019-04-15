@@ -321,29 +321,31 @@ controlPanel sharedState model =
                 , row [ spacing 8 ] [ el [ Font.bold ] (text "Group:"), noFilterButton model, filterByDayButton model ]
                 ]
             ]
-        , timerPanel sharedState model
         , newLogPanel model
         ]
 
 
-{-| xxx
--}
-timerPanel : SharedState -> Model -> Element Msg
-timerPanel sharedState model =
-    row [ spacing 12, Font.size 12, padding 8, Border.width 1, width (px 450) ]
-        [ el [ Font.bold ] (text "TIMER")
-        , startTimerButton
-        , pauseTimerButton model
-        , resetTimerButton
-        , logTimerButton
-        , elapsedTimePanel sharedState model
+largeElapsedTimePanel : SharedState -> Model -> Element Msg
+largeElapsedTimePanel sharedState model =
+    column [ spacing 12, padding 12, Border.width 1 ]
+        [ timerDisplay sharedState model
+        , timerControls sharedState model
         ]
 
 
-elapsedTimePanel sharedState model =
+timerControls : SharedState -> Model -> Element Msg
+timerControls sharedState model =
+    row [ spacing 12, Font.size 12, width fill ]
+        [ startTimerButton
+        , pauseTimerButton model
+        , resetTimerButton
+        , logTimerButton
+        ]
+
+
+timerDisplay sharedState model =
     row [ spacing 8 ]
-        [ el [ Font.bold ] (text "Elapsed time")
-        , el [ Font.size 16, Font.bold, padding 8, Font.color Style.red, Background.color Style.black ]
+        [ el [ Font.size 36, Font.bold, padding 8, Font.color Style.red, Background.color Style.black ]
             (text <| timeStringFromFloat <| (sharedState.accumulatedTime + sharedState.elapsedTime) / scaleFactor)
         ]
 
@@ -607,9 +609,9 @@ setHoursButton model =
 -}
 startTimerButton : Element Msg
 startTimerButton =
-    Input.button Style.smallButton
+    Input.button Style.button
         { onPress = Just (TC TCStart)
-        , label = el [ Font.size 12 ] (text "Start")
+        , label = el [ Font.size 14 ] (text "Start")
         }
 
 
@@ -619,27 +621,27 @@ pauseTimerButton model =
         TSPaused ->
             Input.button Style.smallButton
                 { onPress = Just (TC TCContinue)
-                , label = el [ Font.size 12 ] (text "Cont")
+                , label = el [ Font.size 14 ] (text "Cont")
                 }
 
         _ ->
-            Input.button Style.smallButton
+            Input.button Style.button
                 { onPress = Just (TC TCPause)
-                , label = el [ Font.size 12 ] (text "Pause")
+                , label = el [ Font.size 14 ] (text "Pause")
                 }
 
 
 resetTimerButton : Element Msg
 resetTimerButton =
-    Input.button Style.smallButton
+    Input.button Style.button
         { onPress = Just (TC TCReset)
-        , label = el [ Font.size 12 ] (text "Reset")
+        , label = el [ Font.size 14 ] (text "Reset")
         }
 
 
 logTimerButton : Element Msg
 logTimerButton =
-    Input.button Style.smallButton
+    Input.button Style.button
         { onPress = Just (TC TCLog)
         , label = el [ Font.size 12 ] (text "Log")
         }
@@ -868,6 +870,7 @@ chart sharedState model =
                     [ setMinutesButton model
                     , setHoursButton model
                     ]
+                , largeElapsedTimePanel sharedState model
                 ]
 
 
