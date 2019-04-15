@@ -3,8 +3,6 @@ module Utility.Data exposing
     , eventsByDay
     , fillGaps
     , filterValues
-    , fst
-    , fstPlusOne
     , group
     , rataDie
     )
@@ -102,7 +100,7 @@ eventsByDay timeZoneOffset list =
         |> timeSeries
         |> timeSeriesRD
         |> List.sortBy Tuple.first
-        |> fillGaps ( NaiveDateTime "1900-01-1", 0 )
+        |> fillGaps ( NaiveDateTime "1900-01-01", 0 )
         |> group
         |> List.map sumList2
 
@@ -197,68 +195,3 @@ fillGaps default =
                     ( i, item :: fillGap last i ++ acc )
             )
             ( 0, [] )
-
-
-{-|
-
-    > fillGaps "x" [(0,"a"), (0, "aa"), (2, "c"), (4, "e")]
-    [(0,"a"),(0,"aa"),(1,"x"),(2,"c"),(3,"x"),(4,"e")]
-
--}
-fillGaps1 : a -> List ( Int, a ) -> List ( Int, a )
-fillGaps1 default input =
-    fillGapsAux default [ List.head input ] (List.drop 1 input)
-        |> Maybe.Extra.values
-        |> List.reverse
-
-
-fillGapsAux : a -> List (Maybe ( Int, a )) -> List ( Int, a ) -> List (Maybe ( Int, a ))
-fillGapsAux default acc input =
-    case input of
-        [] ->
-            acc
-
-        _ ->
-            let
-                fpo =
-                    fstPlusOne acc
-            in
-            case Maybe.map2 (>=) fpo (fst input) == Just True of
-                True ->
-                    fillGapsAux default (List.head input :: acc) (List.drop 1 input)
-
-                False ->
-                    case fpo of
-                        Nothing ->
-                            fillGapsAux default (List.head input :: acc) (List.drop 1 input)
-
-                        Just k ->
-                            fillGapsAux default (Just ( k, default ) :: acc) input
-
-
-{-|
-
-    > fst [(0,"a"), (0, "aa"), (2, "c"), (4, "e")]
-    Just 0 : Maybe Int
-
--}
-fst : List ( Int, a ) -> Maybe Int
-fst list =
-    Maybe.map Tuple.first (List.head list)
-
-
-{-|
-
-    > fstPlusOne [Just (0,"a"),Just (0,"aa"),Just (2,"c"),Just (4,"e")]
-    Just 1 : Maybe Int
-
--}
-fstPlusOne : List (Maybe ( Int, a )) -> Maybe Int
-fstPlusOne list =
-    List.head list
-        |> Maybe.Extra.join
-        |> Maybe.map (\( i, a ) -> i + 1)
-
-
-
---|> Maybe.map (\x -> x + 1)

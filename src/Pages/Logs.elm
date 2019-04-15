@@ -522,10 +522,6 @@ viewEvents sharedState model =
                           , width = px 40
                           , view = \k event -> el [ Font.size 12 ] (text <| String.fromInt <| k + 1)
                           }
-                        , { header = el [ Font.bold ] (text "Day")
-                          , width = px 40
-                          , view = \k event -> el [ Font.size 12 ] (text <| String.fromInt <| (\x -> x - 737147) <| rataDieFromNaiveDateTime <| (\(NaiveDateTime str) -> str) <| event.insertedAt)
-                          }
                         , { header = el [ Font.bold ] (text "Date")
                           , width = px 80
                           , view = \k event -> el [ Font.size 12 ] (text <| dateStringOfDateTimeString <| (\(NaiveDateTime str) -> str) <| event.insertedAt)
@@ -568,19 +564,29 @@ eventSum eventList =
 
 dateStringOfDateTimeString : String -> String
 dateStringOfDateTimeString str =
-    str
-        |> String.split "T"
-        |> List.head
-        |> Maybe.withDefault "-"
+    case str == "1900-01-01" of
+        True ->
+            ""
+
+        False ->
+            str
+                |> String.split "T"
+                |> List.head
+                |> Maybe.withDefault "-"
 
 
 timeStringOfDateTimeString : String -> String
 timeStringOfDateTimeString str =
-    str
-        |> String.split "T"
-        |> List.reverse
-        |> List.head
-        |> Maybe.withDefault "-"
+    case str == "1900-01-01" of
+        True ->
+            ""
+
+        False ->
+            str
+                |> String.split "T"
+                |> List.reverse
+                |> List.head
+                |> Maybe.withDefault "-"
 
 
 
