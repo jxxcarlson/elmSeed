@@ -423,7 +423,9 @@ filterPanel sharedState model =
 
 controlPanel sharedState model =
     column [ padding 8, Border.width 1, width (px 562), spacing 12 ]
-        [ newLogPanel model ]
+        [ newLogPanel model
+        , el [ Font.size 14 ] (text <| model.message)
+        ]
 
 
 largeElapsedTimePanel : SharedState -> Model -> Element Msg

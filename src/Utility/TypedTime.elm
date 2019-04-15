@@ -165,7 +165,7 @@ hmStringFromSeconds s =
 
 decodeHM : String -> Maybe Float
 decodeHM str =
-    Parser.run parseHM str |> Result.toMaybe
+    Parser.run parseTime str |> Result.toMaybe
 
 
 {-| run parseHM takes a string in the format hh:mm as
@@ -188,7 +188,7 @@ parseHM =
 
 parseTime : Parser Float
 parseTime =
-    oneOf [ backtrackable parseHM, float ]
+    oneOf [ backtrackable parseHM, float |> Parser.map (\x -> 60 * x) ]
 
 
 parseInt_ : Parser Int
