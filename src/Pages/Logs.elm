@@ -318,7 +318,6 @@ controlPanel sharedState model =
                 ]
             , row [ spacing 24, Font.size 14 ]
                 [ row [ spacing 8 ] [ submitEventButton, inputValue model ]
-                , row [ spacing 8 ] [ el [ Font.bold ] (text "Group:"), noFilterButton model, filterByDayButton model ]
                 ]
             ]
         , newLogPanel model
@@ -440,17 +439,17 @@ logNameButton currentLog log =
 
 noFilterButton : Model -> Element Msg
 noFilterButton model =
-    Input.button (Style.titleButton (model.filterState == NoGrouping))
+    Input.button (Style.activeButton (model.filterState == NoGrouping))
         { onPress = Just (SetGroupFilter NoGrouping)
-        , label = Element.text "None"
+        , label = el [ Font.size 12 ] (text "None")
         }
 
 
 filterByDayButton : Model -> Element Msg
 filterByDayButton model =
-    Input.button (Style.titleButton (model.filterState == GroupByDay))
+    Input.button (Style.activeButton (model.filterState == GroupByDay))
         { onPress = Just (SetGroupFilter GroupByDay)
-        , label = Element.text "By day"
+        , label = el [ Font.size 12 ] (text "By day")
         }
 
 
@@ -862,19 +861,25 @@ chart sharedState model =
 
         Just eventList_ ->
             let
+                today =
+                    Utility.DateTime.naiveDateStringFromPosix sharedState.currentTime
+
+                events2 =
+                    dateFilter today model.dateFilter eventList_
+
                 events =
                     case model.filterState of
                         NoGrouping ->
-                            Data.correctTimeZone model.timeZoneOffset eventList_
+                            Data.correctTimeZone model.timeZoneOffset events2
 
                         GroupByDay ->
-                            Data.eventsByDay model.timeZoneOffset eventList_
+                            Data.eventsByDay model.timeZoneOffset events2
             in
             column [ Font.size 12, spacing 36, moveRight 40, width (px 450) ]
-                [ row [] [ Graph.barChart (gA model) (prepareData (getScaleFactor model) events) |> Element.html ]
-                , row [ spacing 8 ]
-                    [ setMinutesButton model
-                    , setHoursButton model
+                [ row [ moveLeft 40 ] [ Graph.barChart (gA model) (prepareData (getScaleFactor model) events) |> Element.html ]
+                , row [ spacing 16 ]
+                    [ row [ spacing 8 ] [ setMinutesButton model, setHoursButton model ]
+                    , row [ spacing 8 ] [ el [ Font.bold, Font.size 14 ] (text "Group:"), noFilterButton model, filterByDayButton model ]
                     ]
                 , largeElapsedTimePanel sharedState model
                 ]

@@ -174,8 +174,8 @@ Actually, needed to start acc at `(-1 , [])` if there's no leading zeros:
     Folds are fun. You can keep as much state around as you want for the intermediate calculations and just throw it away when you're done
 
 -}
-fillGaps : a -> List ( Int, a ) -> List ( Int, a )
-fillGaps default =
+fillGaps1 : a -> List ( Int, a ) -> List ( Int, a )
+fillGaps1 default =
     let
         fillGap start end =
             List.range (start + 1) (end - 1)
@@ -195,3 +195,31 @@ fillGaps default =
                     ( i, item :: fillGap last i ++ acc )
             )
             ( 0, [] )
+
+
+fillGaps : a -> List ( Int, a ) -> List ( Int, a )
+fillGaps default list =
+    let
+        fillGap start end =
+            List.range (start + 1) (end - 1)
+                |> List.map (\i -> ( i, default ))
+
+        ii : Int
+        ii =
+            Maybe.map Tuple.first (List.head list) |> Maybe.withDefault 0
+    in
+    List.foldl
+        (\(( i, a ) as item) ( last, acc ) ->
+            if i == last then
+                ( last, item :: acc )
+
+            else if i == last + 1 then
+                ( last + 1, item :: acc )
+
+            else
+                ( i, item :: fillGap last i ++ acc )
+        )
+        ( ii, [] )
+        list
+        |> Tuple.second
+        |> List.reverse
