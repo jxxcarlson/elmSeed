@@ -310,10 +310,10 @@ update sharedState msg model =
                     ( { model | message = "No user signed in" }, Cmd.none, NoUpdate )
 
                 ( Just user, Nothing ) ->
-                    ( { model | appMode = nextAppMode }, getLogs user.id, NoUpdate )
+                    ( { model | appMode = nextAppMode, filterState = NoGrouping }, getLogs user.id, NoUpdate )
 
                 ( Just _, Just _ ) ->
-                    ( { model | appMode = nextAppMode }, Cmd.none, NoUpdate )
+                    ( { model | appMode = nextAppMode, filterState = NoGrouping }, Cmd.none, NoUpdate )
 
         SetCurrentEvent event_ ->
             ( { model | currentEvent = Just event_ }, Cmd.none, NoUpdate )
@@ -346,16 +346,36 @@ view sharedState model =
 editPanel sharedState model =
     column [ spacing 12, width (px 300), alignTop ]
         [ el [ Font.size 16, Font.bold, alignTop ] (text "Edit Panel")
-        , editLogNameInput model
-        , row [ spacing 12 ] [ updateLogButton, deleteLogButton ]
-        , row [ spacing 12 ] [ deleteEventButton model ]
+        , logEditPanel sharedState model
+
+        -- , deleteEventButton model
+        , logEventPanel sharedState model
         ]
+
+
+logEditPanel sharedState model =
+    column [ padding 12, Border.width 1, spacing 12 ]
+        [ editLogNameInput model
+        , updateLogButton
+        , deleteLogButton
+        ]
+
+
+logEventPanel sharedState model =
+    case model.currentEvent of
+        Nothing ->
+            Element.none
+
+        Just event_ ->
+            column [ padding 12, Border.width 1 ]
+                [ deleteEventButton event_
+                ]
 
 
 editLogNameInput model =
     Input.text (inputStyle ++ [ width (px 200) ])
         { onChange = GotUpdatedLogName
-        , text = model.valueString
+        , text = model.updatedLogName
         , placeholder = Nothing
         , label = Input.labelLeft [ Font.size 16, moveDown 8 ] (text "New log name")
         }
@@ -365,7 +385,7 @@ updateLogButton : Element Msg
 updateLogButton =
     Input.button Style.button
         { onPress = Just NoOp
-        , label = Element.text "Update"
+        , label = Element.text "Update log"
         }
 
 
@@ -377,17 +397,12 @@ deleteLogButton =
         }
 
 
-deleteEventButton : Model -> Element Msg
-deleteEventButton model =
-    case model.currentEvent of
-        Nothing ->
-            Element.none
-
-        Just event_ ->
-            Input.button Style.button
-                { onPress = Just NoOp
-                , label = Element.text <| "Remove event " ++ String.fromInt event_.id
-                }
+deleteEventButton : Event -> Element Msg
+deleteEventButton event =
+    Input.button Style.button
+        { onPress = Just NoOp
+        , label = Element.text <| "Remove event " ++ String.fromInt event.id
+        }
 
 
 
@@ -663,7 +678,7 @@ setCurrentEventButton : Model -> Event -> Int -> Element Msg
 setCurrentEventButton model event index =
     Input.button (Style.titleButton (Just event == model.currentEvent))
         { onPress = Just (SetCurrentEvent event)
-        , label = el [ Font.bold ] (Element.text <| String.fromInt index ++ ", " ++ String.fromInt event.id)
+        , label = el [ Font.bold ] (Element.text <| String.fromInt index ++ ": " ++ String.fromInt event.id)
         }
 
 
