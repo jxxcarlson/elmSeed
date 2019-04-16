@@ -11,14 +11,14 @@ module Utility.TypedTime exposing
 import Parser exposing (..)
 
 
+type TypedTime
+    = TypedTime Unit Float
+
+
 type Unit
     = Seconds
     | Minutes
     | Hours
-
-
-type TypedTime
-    = TypedTime Unit Float
 
 
 multiply : Float -> TypedTime -> TypedTime

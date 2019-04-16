@@ -228,7 +228,7 @@ update sharedState msg model =
                     Maybe.map (List.filter (\log -> log.id == logId)) sharedState.currentLogList
                         |> Maybe.andThen List.head
             in
-            ( model, getEvents logId, UpdateCurrentLog maybeLog )
+            ( { model | currentEvent = Nothing }, getEvents logId, UpdateCurrentLog maybeLog )
 
         EventCreated (Ok maybeEvent) ->
             case ( maybeEvent, sharedState.currentEventList ) of
