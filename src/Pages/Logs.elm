@@ -274,8 +274,13 @@ update sharedState msg model =
         DeleteEvent id ->
             ( model, deleteEvent id, NoUpdate )
 
-        EventDeleted (Ok event) ->
-            ( { model | message = "Events received" }, Cmd.none, NoUpdate )
+        EventDeleted (Ok maybeEvent) ->
+            case maybeEvent of
+                Nothing ->
+                    ( { model | message = "No event deleted" }, Cmd.none, NoUpdate )
+
+                Just event ->
+                    ( { model | message = "Events received" }, Cmd.none, RemoveEventFromSharedEventList event.id )
 
         EventDeleted (Err _) ->
             ( { model | message = "Error deleting event" }, Cmd.none, NoUpdate )

@@ -69,6 +69,7 @@ type SharedStateUpdate
     | UpdateSharedLogList (List Log)
     | UpdateCurrentLog (Maybe Log)
     | UpdateSharedEventList (List Event)
+    | RemoveEventFromSharedEventList Int
 
 
 initialSharedState : Browser.Navigation.Key -> Posix -> Int -> Int -> Maybe User -> SharedState
@@ -137,6 +138,9 @@ update sharedState sharedStateUpdate =
 
         UpdateSharedEventList eventList ->
             { sharedState | currentEventList = Just eventList }
+
+        RemoveEventFromSharedEventList eventId ->
+            { sharedState | currentEventList = Maybe.map (List.filter (\event -> event.id /= eventId)) sharedState.currentEventList }
 
         UpdateCurrentLog maybeLog ->
             case maybeLog of
