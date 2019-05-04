@@ -2,6 +2,7 @@ module Utility.DateTime exposing
     ( dateFromNaiveDateTime
     , dateFromNaiveDateTime2
     , daysBetweenNaiveDates
+    , humanDateFromNaiveDateTime
     , inLastNDaysBeforeDate
     , isoStringFromNaiveDateTime
     , naiveDateStringFromPosix
@@ -11,6 +12,7 @@ module Utility.DateTime exposing
     )
 
 import Date exposing (Date, Unit(..), diff)
+import Logger.Scalar exposing (NaiveDateTime(..))
 import Parser exposing (..)
 import Time exposing (Posix)
 
@@ -111,6 +113,14 @@ isoStringFromNaiveDateTime : String -> Maybe String
 isoStringFromNaiveDateTime str =
     String.split "T" str
         |> List.head
+
+
+humanDateFromNaiveDateTime : NaiveDateTime -> String
+humanDateFromNaiveDateTime (NaiveDateTime str) =
+    str
+        |> dateFromNaiveDateTime2
+        |> Maybe.map (Date.format "EE, MMM d")
+        |> Maybe.withDefault ""
 
 
 dateFromNaiveDateTime : String -> Result String Date

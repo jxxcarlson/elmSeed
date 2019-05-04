@@ -2,7 +2,7 @@
 -- https://github.com/dillonkearns/elm-graphql
 
 
-module Logger.Mutation exposing (CreateEventRequiredArguments, CreateLogRequiredArguments, createEvent, createLog)
+module Logger.Mutation exposing (CreateEventRequiredArguments, CreateLogRequiredArguments, DeleteEventRequiredArguments, createEvent, createLog, deleteEvent)
 
 import Graphql.Internal.Builder.Argument as Argument exposing (Argument)
 import Graphql.Internal.Builder.Object as Object
@@ -41,3 +41,12 @@ type alias CreateLogRequiredArguments =
 createLog : CreateLogRequiredArguments -> SelectionSet decodesTo Logger.Object.Log -> SelectionSet (Maybe decodesTo) RootMutation
 createLog requiredArgs object_ =
     Object.selectionForCompositeField "createLog" [ Argument.required "logType" requiredArgs.logType (Encode.enum Logger.Enum.LogTypeValue.toString), Argument.required "name" requiredArgs.name Encode.string, Argument.required "userId" requiredArgs.userId Encode.int ] object_ (identity >> Decode.nullable)
+
+
+type alias DeleteEventRequiredArguments =
+    { id : Int }
+
+
+deleteEvent : DeleteEventRequiredArguments -> SelectionSet decodesTo Logger.Object.Event -> SelectionSet (Maybe decodesTo) RootMutation
+deleteEvent requiredArgs object_ =
+    Object.selectionForCompositeField "deleteEvent" [ Argument.required "id" requiredArgs.id Encode.int ] object_ (identity >> Decode.nullable)

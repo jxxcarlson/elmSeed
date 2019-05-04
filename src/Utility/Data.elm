@@ -100,7 +100,7 @@ eventsByDay timeZoneOffset list =
         |> timeSeries
         |> timeSeriesRD
         |> List.sortBy Tuple.first
-        |> fillGaps ( NaiveDateTime "1900-01-01", 0 )
+        |> fillGaps ( NaiveDateTime "", 0 )
         |> group
         |> List.map sumList2
 

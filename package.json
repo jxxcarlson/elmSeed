@@ -3,5 +3,12 @@
   "version": "1.0.0",
   "scripts": {
     "api": "elm-graphql http://localhost:4000/graphiql --base Logger"
+  },
+  "devDependencies": {
+    "@dillonkearns/elm-graphql": "^3.4.0"
+  },
+  "dependencies": {
+    "express-graphql": "^0.8.0",
+    "graphiql": "^0.13.0"
   }
 }

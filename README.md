@@ -19,3 +19,19 @@ This function can be used in a child page, and the `SharedStateUpdate` construct
 ## Installation
 
 For now: `elm make src/Main.elm --output=Main.js`.  Then start `elm reactor` and click on `index.html`
+
+
+## Graphql
+
+**NOTE**  When running `npm run api` to generate Elm code
+from the schema, authentication must be disabled.  For
+the moment, this is very clunky: switch `call` and `call1`
+in `LogServerWeb.Context` of the server.
+
+[GraphQL/Learn](https://graphql.github.io/learn/queries/)
+
+[Example: curl, authorization](https://developer.github.com/v4/guides/intro-to-graphql/)
+
+[Elixir-Absinthe tutorial](https://www.howtographql.com/graphql-elixir/0-introduction/)
+
+[GraphQL Playground (Web)](https://www.graphqlbin.com/v2/new)

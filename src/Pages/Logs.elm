@@ -3,6 +3,7 @@ module Pages.Logs exposing
     , Msg(..)
     , getLogs
     , initModel
+    , makeLog
     , update
     , view
     )
@@ -10,7 +11,6 @@ module Pages.Logs exposing
 --
 
 import Common.Style as Style
-import Common.Utility as Utility
 import Configuration
 import Element exposing (..)
 import Element.Background as Background
@@ -129,6 +129,8 @@ type Msg
     | EventCreated (Result (Graphql.Http.Error (Maybe Event)) (Maybe Event))
     | MakeEvent
     | GotValueString String
+    | DeleteEvent Int
+    | EventDeleted (Result (Graphql.Http.Error (Maybe Event)) (Maybe Event))
       --
     | GotLogFilter String
     | GotEventDateFilter String
@@ -269,6 +271,15 @@ update sharedState msg model =
                             , NoUpdate
                             )
 
+        DeleteEvent id ->
+            ( model, deleteEvent id, NoUpdate )
+
+        EventDeleted (Ok event) ->
+            ( { model | message = "Events received" }, Cmd.none, NoUpdate )
+
+        EventDeleted (Err _) ->
+            ( { model | message = "Error deleting event" }, Cmd.none, NoUpdate )
+
         SetGroupFilter filterState ->
             ( { model | filterState = filterState }, Cmd.none, NoUpdate )
 
@@ -347,8 +358,6 @@ editPanel sharedState model =
     column [ spacing 12, width (px 300), alignTop ]
         [ el [ Font.size 16, Font.bold, alignTop ] (text "Edit Panel")
         , logEditPanel sharedState model
-
-        -- , deleteEventButton model
         , logEventPanel sharedState model
         ]
 
@@ -366,9 +375,9 @@ logEventPanel sharedState model =
         Nothing ->
             Element.none
 
-        Just event_ ->
+        Just evt ->
             column [ padding 12, Border.width 1 ]
-                [ deleteEventButton event_
+                [ deleteEventButton evt
                 ]
 
 
@@ -400,7 +409,7 @@ deleteLogButton =
 deleteEventButton : Event -> Element Msg
 deleteEventButton event =
     Input.button Style.button
-        { onPress = Just NoOp
+        { onPress = Just (DeleteEvent event.id)
         , label = Element.text <| "Remove event " ++ String.fromInt event.id
         }
 
@@ -633,7 +642,9 @@ viewEvents sharedState model =
                           }
                         , { header = el [ Font.bold ] (text "Date")
                           , width = px 80
-                          , view = \k event -> el [ Font.size 12 ] (text <| dateStringOfDateTimeString <| (\(NaiveDateTime str) -> str) <| event.insertedAt)
+
+                          --, view = \k event -> el [ Font.size 12 ] (text <| dateStringOfDateTimeString <| (\(NaiveDateTime str) -> str) <| event.insertedAt)
+                          , view = \k event -> el [ Font.size 12 ] (text <| dateStringOfDateTimeString <| (\ndt -> Utility.DateTime.humanDateFromNaiveDateTime ndt) <| event.insertedAt)
                           }
                         , { header = el [ Font.bold ] (text "Time")
                           , width = px 80
@@ -920,6 +931,18 @@ inputStyle =
 --
 -- GRAPHQL
 --
+--
+-- GET LOGS
+--
+
+
+getLogs : Int -> Cmd Msg
+getLogs userId =
+    logQuery userId
+        |> Graphql.Http.queryRequest (Configuration.backend ++ "/graphiql")
+        |> Graphql.Http.withHeader "authorization" authorizationHeader
+        -- |> Graphql.Http.withHeader "Access-Control-Allow-Origin" "http://localhost:4000"
+        |> Graphql.Http.send GotLogs
 
 
 logQuery : Int -> SelectionSet (List Log) RootQuery
@@ -935,13 +958,45 @@ logSelection =
         Logger.Object.Log.userId
 
 
-getLogs : Int -> Cmd Msg
-getLogs userId =
-    logQuery userId
+
+--
+-- GET EVENTS
+--
+
+
+getEvents : Int -> Cmd Msg
+getEvents logId =
+    eventQuery logId
         |> Graphql.Http.queryRequest (Configuration.backend ++ "/graphiql")
         |> Graphql.Http.withHeader "authorization" authorizationHeader
-        -- |> Graphql.Http.withHeader "Access-Control-Allow-Origin" "http://localhost:4000"
-        |> Graphql.Http.send GotLogs
+        |> Graphql.Http.send GotEvents
+
+
+eventQuery : Int -> SelectionSet (List Event) RootQuery
+eventQuery logId =
+    Query.listEventsForLog { logId = logId } eventSelection
+
+
+floatValueFromString : Unit -> String -> Float
+floatValueFromString inputUnit str =
+    str
+        |> String.toFloat
+        |> Maybe.withDefault 0
+        |> TypedTime.convertScalarToSecondsWithUnit inputUnit
+
+
+
+--
+-- CREATE LOG
+--
+
+
+makeLog : Int -> String -> LogTypeValue -> Cmd Msg
+makeLog userId name logType =
+    logMutation userId name logType logSelection
+        |> Graphql.Http.mutationRequest (Configuration.backend ++ "/graphiql")
+        |> Graphql.Http.withHeader "authorization" authorizationHeader
+        |> Graphql.Http.send LogCreated
 
 
 logMutation :
@@ -954,16 +1009,18 @@ logMutation userId name logType =
     Mutation.createLog { userId = userId, logType = logType, name = name }
 
 
-makeLog userId name logType =
-    logMutation userId name logType logSelection
+
+--
+-- CREATE EVENT
+--
+
+
+makeEvent : Int -> Float -> Cmd Msg
+makeEvent logId value =
+    fpEventMutation logId value eventSelection
         |> Graphql.Http.mutationRequest (Configuration.backend ++ "/graphiql")
         |> Graphql.Http.withHeader "authorization" authorizationHeader
-        |> Graphql.Http.send LogCreated
-
-
-eventQuery : Int -> SelectionSet (List Event) RootQuery
-eventQuery logId =
-    Query.listEventsForLog { logId = logId } eventSelection
+        |> Graphql.Http.send EventCreated
 
 
 fpEventMutation :
@@ -975,19 +1032,26 @@ fpEventMutation logId value =
     Mutation.createEvent { logId = logId, value = value }
 
 
-floatValueFromString : Unit -> String -> Float
-floatValueFromString inputUnit str =
-    str
-        |> String.toFloat
-        |> Maybe.withDefault 0
-        |> TypedTime.convertScalarToSecondsWithUnit inputUnit
+
+--
+-- DELETE EVENT
+--
 
 
-makeEvent logId value =
-    fpEventMutation logId value eventSelection
+deleteEvent : Int -> Cmd Msg
+deleteEvent id =
+    eventMutation id eventSelection
         |> Graphql.Http.mutationRequest (Configuration.backend ++ "/graphiql")
         |> Graphql.Http.withHeader "authorization" authorizationHeader
-        |> Graphql.Http.send EventCreated
+        |> Graphql.Http.send EventDeleted
+
+
+eventMutation :
+    Int
+    -> SelectionSet decodesTo Logger.Object.Event
+    -> SelectionSet (Maybe decodesTo) Graphql.Operation.RootMutation
+eventMutation id =
+    Mutation.deleteEvent { id = id }
 
 
 eventSelection : SelectionSet Event Logger.Object.Event
@@ -1004,14 +1068,6 @@ type alias EventListResponse =
 
 type alias LogListResponse =
     List Log
-
-
-getEvents : Int -> Cmd Msg
-getEvents logId =
-    eventQuery logId
-        |> Graphql.Http.queryRequest (Configuration.backend ++ "/graphiql")
-        |> Graphql.Http.withHeader "authorization" authorizationHeader
-        |> Graphql.Http.send GotEvents
 
 
 query1 : SelectionSet () RootQuery
