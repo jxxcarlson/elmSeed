@@ -59,6 +59,7 @@ type alias Model =
     , inputUnit : Unit
     , outputUnit : Unit
     , appMode : AppMode
+    , phoneAppMode : PhoneAppMode
     , currentEvent : Maybe Event
     }
 
@@ -79,6 +80,7 @@ initModel =
     , inputUnit = Seconds
     , outputUnit = Minutes
     , appMode = Logging
+    , phoneAppMode = ShowingLogs
     , currentEvent = Nothing
     }
 
@@ -86,6 +88,12 @@ initModel =
 type AppMode
     = Logging
     | Editing
+
+
+type PhoneAppMode
+    = ShowingLogs
+    | ShowingEvents
+    | ShowingChart
 
 
 type TimerState
@@ -145,6 +153,8 @@ type Msg
     | SetUnits Unit
     | SetAppMode AppMode
     | SetCurrentEvent Event
+      --
+    | SetPhoneAppMode PhoneAppMode
 
 
 
@@ -203,7 +213,7 @@ update sharedState msg model =
                     ( model, getLogs user.id, NoUpdate )
 
         GotLogs (Ok logs) ->
-            ( { model | message = "Logs received" }, Cmd.none, UpdateSharedLogList logs )
+            ( { model | phoneAppMode = ShowingLogs, message = "Logs received" }, Cmd.none, UpdateSharedLogList logs )
 
         GotLogs (Err _) ->
             ( { model | message = "Error getting logs" }, Cmd.none, NoUpdate )
@@ -230,7 +240,7 @@ update sharedState msg model =
                     Maybe.map (List.filter (\log -> log.id == logId)) sharedState.currentLogList
                         |> Maybe.andThen List.head
             in
-            ( { model | currentEvent = Nothing }, getEvents logId, UpdateCurrentLog maybeLog )
+            ( { model | phoneAppMode = ShowingEvents, currentEvent = Nothing }, getEvents logId, UpdateCurrentLog maybeLog )
 
         EventCreated (Ok maybeEvent) ->
             case ( maybeEvent, sharedState.currentEventList ) of
@@ -334,9 +344,34 @@ update sharedState msg model =
         SetCurrentEvent event_ ->
             ( { model | currentEvent = Just event_ }, Cmd.none, NoUpdate )
 
+        SetPhoneAppMode phoneAppMode ->
+            ( { model | phoneAppMode = phoneAppMode }, Cmd.none, NoUpdate )
+
+
+
+--
+-- VIEW
+--
+
 
 view : SharedState -> Model -> Element Msg
 view sharedState model =
+    case classifyDevice { width = sharedState.windowWidth, height = sharedState.windowHeight } |> .class of
+        Phone ->
+            phoneView sharedState model
+
+        _ ->
+            mainView sharedState model
+
+
+
+--
+-- MAINVIEW
+--
+
+
+mainView : SharedState -> Model -> Element Msg
+mainView sharedState model =
     column (Style.mainColumn fill fill ++ [ spacing 12, padding 40, Background.color (Style.makeGrey 0.9) ])
         [ filterPanel sharedState model
         , row [ spacing 12 ]
@@ -350,6 +385,71 @@ view sharedState model =
                     editPanel sharedState model
             ]
         , controlPanel sharedState model
+        ]
+
+
+
+--
+-- PHONEVIEW
+--
+
+
+phoneView : SharedState -> Model -> Element Msg
+phoneView sharedState model =
+    column (Style.mainColumn fill fill ++ [ spacing 12, padding 40, Background.color (Style.makeGrey 0.9) ])
+        [ case model.phoneAppMode of
+            ShowingLogs ->
+                filterLogsPanel sharedState model
+
+            ShowingEvents ->
+                filterEventsPanel sharedState model
+
+            ShowingChart ->
+                Element.none
+        , row [ spacing 12 ]
+            [ case model.phoneAppMode of
+                ShowingLogs ->
+                    logListPanelForPhone sharedState model
+
+                ShowingEvents ->
+                    eventListDisplayPhone sharedState model
+
+                ShowingChart ->
+                    chartPanelForPhone sharedState model
+
+            --            , case model.appMode of
+            --                Logging ->
+            --                    eventPanel sharedState model
+            --
+            --                Editing ->
+            --                    editPanel sharedState model
+            ]
+        , case model.phoneAppMode of
+            ShowingLogs ->
+                controlPanelForPhone sharedState model
+
+            ShowingEvents ->
+                newEventPanel sharedState model
+
+            ShowingChart ->
+                Element.none
+        ]
+
+
+filterLogsPanel sharedState model =
+    row [ spacing 8 ]
+        [ el [ Font.bold ] (text "Filter:")
+        , inputLogNameFilter model
+
+        --  , row [ alignRight, moveRight 36, spacing 12 ] [ editModeButton sharedState model, logModeButton model ]
+        ]
+
+
+filterEventsPanel sharedState model =
+    row [ spacing 8 ]
+        [ el [ Font.bold ] (text "Since:")
+        , inputEventDateFilter model
+        , goToChartButton model
         ]
 
 
@@ -403,6 +503,35 @@ updateLogButton =
         }
 
 
+goToChartButton : Model -> Element Msg
+goToChartButton model =
+    Input.button Style.button
+        { onPress = Just (SetPhoneAppMode ShowingChart)
+        , label = Element.text "Chart"
+        }
+
+
+goToEventsButton : Model -> Element Msg
+goToEventsButton model =
+    Input.button Style.button
+        { onPress = Just (SetPhoneAppMode ShowingEvents)
+        , label = Element.text "Events"
+        }
+
+
+phoneAppModeString : Model -> String
+phoneAppModeString model =
+    case model.phoneAppMode of
+        ShowingLogs ->
+            "Logs"
+
+        ShowingEvents ->
+            "Events"
+
+        ShowingChart ->
+            "Chart"
+
+
 deleteLogButton : Element Msg
 deleteLogButton =
     Input.button Style.button
@@ -439,6 +568,15 @@ controlPanel sharedState model =
     column [ padding 8, Border.width 1, width (px 562), spacing 12 ]
         [ newLogPanel model
         , el [ Font.size 14 ] (text <| model.message)
+        , el [ Font.size 11 ] (text <| "Server: " ++ Configuration.backend)
+        ]
+
+
+controlPanelForPhone sharedState model =
+    column [ padding 8, Border.width 1, width (px 350), spacing 12 ]
+        [ newLogPanelForPhone model
+        , el [ Font.size 14 ] (text <| model.message)
+        , el [ Font.size 11 ] (text <| "Server: " ++ Configuration.backend)
         ]
 
 
@@ -509,8 +647,15 @@ secondsFromPosix p =
 
 logListPanel : SharedState -> Model -> Element Msg
 logListPanel sharedState model =
-    column [ spacing 20, height (px 450), width (px 200), Border.width 1 ]
+    column [ spacing 20, height (px 450), width (px 350), Border.width 1 ]
         [ viewLogs sharedState model
+        ]
+
+
+logListPanelForPhone : SharedState -> Model -> Element Msg
+logListPanelForPhone sharedState model =
+    column [ spacing 20, height (px 450), width (px 350), Border.width 1 ]
+        [ viewLogsForPhone sharedState model
         ]
 
 
@@ -526,6 +671,33 @@ viewLogs sharedState model =
             column [ spacing 12, padding 20, height (px 400) ]
                 [ el [ Font.size 16, Font.bold ] (text "Logs")
                 , indexedTable
+                    [ spacing 4, Font.size 12 ]
+                    { data = filterLogs model.logFilterString logs
+                    , columns =
+                        [ { header = el [ Font.bold ] (text "k")
+                          , width = px 40
+                          , view = \k log -> el [ Font.size 12 ] (text <| String.fromInt <| k + 1)
+                          }
+                        , { header = el [ Font.bold ] (text "Name")
+                          , width = px 80
+                          , view = \k log -> el [ Font.size 12 ] (logNameButton sharedState.currentLog log)
+                          }
+                        ]
+                    }
+                ]
+
+
+viewLogsForPhone : SharedState -> Model -> Element Msg
+viewLogsForPhone sharedState model =
+    case sharedState.currentLogList of
+        Nothing ->
+            column [ spacing 12, padding 20, height (px 400), Font.size 16 ]
+                [ el [ Font.bold ] (text "No logs available")
+                ]
+
+        Just logs ->
+            column [ spacing 12, padding 20, height (px 400) ]
+                [ indexedTable
                     [ spacing 4, Font.size 12 ]
                     { data = filterLogs model.logFilterString logs
                     , columns =
@@ -574,6 +746,13 @@ filterByDayButton model =
 eventListDisplay : SharedState -> Model -> Element Msg
 eventListDisplay sharedState model =
     column [ spacing 20, height (px 450), width (px 350), Border.width 1 ]
+        [ viewEvents sharedState model
+        ]
+
+
+eventListDisplayPhone : SharedState -> Model -> Element Msg
+eventListDisplayPhone sharedState model =
+    column [ spacing 20, height (px 350), width (px 350), Border.width 1 ]
         [ viewEvents sharedState model
         ]
 
@@ -637,7 +816,7 @@ viewEvents sharedState model =
                     TypedTime.multiply (1.0 / nEvents) eventSum_
             in
             column [ spacing 12, padding 20, height (px 430), scrollbarY ]
-                [ el [ Font.size 16, Font.bold ] (text "Events")
+                [ el [ Font.size 16, Font.bold ] (text (Maybe.map .name sharedState.currentLog |> Maybe.withDefault "XXX"))
                 , indexedTable [ spacing 4, Font.size 12 ]
                     { data = events
                     , columns =
@@ -864,9 +1043,24 @@ createLButton model =
         }
 
 
+createLButtonForPhone : Model -> Element Msg
+createLButtonForPhone model =
+    Input.button Style.button
+        { onPress = Just CreateLog
+        , label = el [ Font.size 14 ] (text "Create log")
+        }
+
+
 newLogPanel model =
     row [ spacing 12, Font.size 12 ]
         [ createLButton model
+        , inputLogName model
+        ]
+
+
+newLogPanelForPhone model =
+    row [ spacing 12, Font.size 12 ]
+        [ createLButtonForPhone model
         , inputLogName model
         ]
 
@@ -946,7 +1140,7 @@ getLogs userId =
     logQuery userId
         |> Graphql.Http.queryRequest (Configuration.backend ++ "/graphiql")
         |> Graphql.Http.withHeader "authorization" authorizationHeader
-        -- |> Graphql.Http.withHeader "Access-Control-Allow-Origin" "http://localhost:4000"
+        |> Graphql.Http.withHeader "Access-Control-Allow-Origin" Configuration.backend
         |> Graphql.Http.send GotLogs
 
 
@@ -974,6 +1168,7 @@ getEvents logId =
     eventQuery logId
         |> Graphql.Http.queryRequest (Configuration.backend ++ "/graphiql")
         |> Graphql.Http.withHeader "authorization" authorizationHeader
+        |> Graphql.Http.withHeader "Access-Control-Allow-Origin" Configuration.backend
         |> Graphql.Http.send GotEvents
 
 
@@ -1001,6 +1196,7 @@ makeLog userId name logType =
     logMutation userId name logType logSelection
         |> Graphql.Http.mutationRequest (Configuration.backend ++ "/graphiql")
         |> Graphql.Http.withHeader "authorization" authorizationHeader
+        |> Graphql.Http.withHeader "Access-Control-Allow-Origin" Configuration.backend
         |> Graphql.Http.send LogCreated
 
 
@@ -1025,6 +1221,7 @@ makeEvent logId value =
     fpEventMutation logId value eventSelection
         |> Graphql.Http.mutationRequest (Configuration.backend ++ "/graphiql")
         |> Graphql.Http.withHeader "authorization" authorizationHeader
+        |> Graphql.Http.withHeader "Access-Control-Allow-Origin" Configuration.backend
         |> Graphql.Http.send EventCreated
 
 
@@ -1048,6 +1245,7 @@ deleteEvent id =
     eventMutation id eventSelection
         |> Graphql.Http.mutationRequest (Configuration.backend ++ "/graphiql")
         |> Graphql.Http.withHeader "authorization" authorizationHeader
+        |> Graphql.Http.withHeader "Access-Control-Allow-Origin" Configuration.backend
         |> Graphql.Http.send EventDeleted
 
 
@@ -1118,9 +1316,42 @@ eventPanel sharedState model =
                 ]
 
 
+chartPanelForPhone : SharedState -> Model -> Element Msg
+chartPanelForPhone sharedState model =
+    case sharedState.currentEventList of
+        Nothing ->
+            Element.none
+
+        Just eventList_ ->
+            let
+                today =
+                    Utility.DateTime.naiveDateStringFromPosix sharedState.currentTime
+
+                events2 =
+                    dateFilter today model.dateFilter eventList_
+
+                events =
+                    case model.filterState of
+                        NoGrouping ->
+                            Data.correctTimeZone model.timeZoneOffset events2
+
+                        GroupByDay ->
+                            Data.eventsByDay model.timeZoneOffset events2
+            in
+            column [ Font.size 12, spacing 36, moveRight 40, width (px 350) ]
+                [ goToEventsButton model
+                , row [ moveLeft 80 ] [ Graph.barChart (gA model) (prepareData (getScaleFactor model) events) |> Element.html ]
+                , row [ spacing 16 ]
+                    [ row [ spacing 8 ] [ setMinutesButton model, setHoursButton model ]
+                    , row [ spacing 8 ] [ el [ Font.bold, Font.size 14 ] (text "Group:"), noFilterButton model, filterByDayButton model ]
+                    ]
+                , newEventPanel sharedState model
+                ]
+
+
 newEventPanel : SharedState -> Model -> Element Msg
 newEventPanel sharedState model =
-    column [ Border.width 1, padding 12, spacing 24 ]
+    column [ Border.width 1, padding 12, spacing 24, width (px 350) ]
         [ row [ spacing 12 ] [ submitEventButton, inputValue model ]
         , largeElapsedTimePanel sharedState model
         ]
