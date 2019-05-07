@@ -416,20 +416,13 @@ phoneView sharedState model =
 
                 ShowingChart ->
                     chartPanelForPhone sharedState model
-
-            --            , case model.appMode of
-            --                Logging ->
-            --                    eventPanel sharedState model
-            --
-            --                Editing ->
-            --                    editPanel sharedState model
             ]
         , case model.phoneAppMode of
             ShowingLogs ->
                 controlPanelForPhone sharedState model
 
             ShowingEvents ->
-                newEventPanel sharedState model
+                newEventPanel 300 sharedState model
 
             ShowingChart ->
                 Element.none
@@ -573,7 +566,7 @@ controlPanel sharedState model =
 
 
 controlPanelForPhone sharedState model =
-    column [ padding 8, Border.width 1, width (px 350), spacing 12 ]
+    column [ padding 8, Border.width 1, width (px 300), spacing 12 ]
         [ newLogPanelForPhone model
         , el [ Font.size 14 ] (text <| model.message)
         , el [ Font.size 11 ] (text <| "Server: " ++ Configuration.backend)
@@ -654,7 +647,7 @@ logListPanel sharedState model =
 
 logListPanelForPhone : SharedState -> Model -> Element Msg
 logListPanelForPhone sharedState model =
-    column [ spacing 20, height (px 450), width (px 350), Border.width 1 ]
+    column [ spacing 20, height (px 350), width (px 300), Border.width 1 ]
         [ viewLogsForPhone sharedState model
         ]
 
@@ -752,7 +745,7 @@ eventListDisplay sharedState model =
 
 eventListDisplayPhone : SharedState -> Model -> Element Msg
 eventListDisplayPhone sharedState model =
-    column [ spacing 20, height (px 350), width (px 350), Border.width 1 ]
+    column [ spacing 20, height (px 300), width (px 300), Border.width 1 ]
         [ viewEvents sharedState model
         ]
 
@@ -1054,14 +1047,14 @@ createLButtonForPhone model =
 newLogPanel model =
     row [ spacing 12, Font.size 12 ]
         [ createLButton model
-        , inputLogName model
+        , inputLogName model 200
         ]
 
 
 newLogPanelForPhone model =
     row [ spacing 12, Font.size 12 ]
         [ createLButtonForPhone model
-        , inputLogName model
+        , inputLogName model 100
         ]
 
 
@@ -1098,8 +1091,9 @@ inputEventDateFilter model =
         }
 
 
-inputLogName model =
-    Input.text (inputStyle ++ [ width (px 200) ])
+inputLogName : Model -> Int -> Element Msg
+inputLogName model w =
+    Input.text (inputStyle ++ [ width (px w) ])
         { onChange = GotLogName
         , text = model.logName
         , placeholder = Nothing
@@ -1312,7 +1306,7 @@ eventPanel sharedState model =
                     [ row [ spacing 8 ] [ setMinutesButton model, setHoursButton model ]
                     , row [ spacing 8 ] [ el [ Font.bold, Font.size 14 ] (text "Group:"), noFilterButton model, filterByDayButton model ]
                     ]
-                , newEventPanel sharedState model
+                , newEventPanel 350 sharedState model
                 ]
 
 
@@ -1338,20 +1332,24 @@ chartPanelForPhone sharedState model =
                         GroupByDay ->
                             Data.eventsByDay model.timeZoneOffset events2
             in
-            column [ Font.size 12, spacing 36, moveRight 40, width (px 350) ]
-                [ goToEventsButton model
-                , row [ moveLeft 80 ] [ Graph.barChart (gA model) (prepareData (getScaleFactor model) events) |> Element.html ]
+            column [ Font.size 12, spacing 18, width (px 300) ]
+                [ row [ spacing 12 ]
+                    [ goToEventsButton model
+                    , el [ Font.bold ] (text "Since:")
+                    , inputEventDateFilter model
+                    ]
+                , row [ moveLeft 20 ] [ Graph.barChart (gAPhone model) (prepareData (getScaleFactor model) events) |> Element.html ]
                 , row [ spacing 16 ]
                     [ row [ spacing 8 ] [ setMinutesButton model, setHoursButton model ]
                     , row [ spacing 8 ] [ el [ Font.bold, Font.size 14 ] (text "Group:"), noFilterButton model, filterByDayButton model ]
                     ]
-                , newEventPanel sharedState model
+                , newEventPanel 300 sharedState model
                 ]
 
 
-newEventPanel : SharedState -> Model -> Element Msg
-newEventPanel sharedState model =
-    column [ Border.width 1, padding 12, spacing 24, width (px 350) ]
+newEventPanel : Int -> SharedState -> Model -> Element Msg
+newEventPanel w sharedState model =
+    column [ Border.width 1, padding 12, spacing 24, width (px w) ]
         [ row [ spacing 12 ] [ submitEventButton, inputValue model ]
         , largeElapsedTimePanel sharedState model
         ]
@@ -1378,6 +1376,17 @@ gA model =
     { graphHeight = 200
     , graphWidth = 400
     , options = [ Color "blue", XTickmarks 7, YTickmarks yTickMarks_, DeltaX 10 ]
+    }
+
+
+gAPhone model =
+    let
+        yTickMarks_ =
+            4
+    in
+    { graphHeight = 200
+    , graphWidth = 300
+    , options = [ Color "blue", XTickmarks 4, YTickmarks yTickMarks_, DeltaX 7.5, Scale 1.0 -1.0 ]
     }
 
 
